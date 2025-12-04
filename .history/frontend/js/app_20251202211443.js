@@ -1,0 +1,493 @@
+// ----------------------------
+//  🔥 Flood Guard App.js
+// ----------------------------
+
+const BACKEND_URL = "http://localhost:5000";
+
+let userLat = null;
+let userLon = null;
+let map = null;
+let latestWeather = null;
+
+
+// ---------------- TAB SWITCHING ----------------
+function showSection(id) {
+    document.querySelectorAll(".section").forEach(sec => {
+        sec.classList.toggle("active", sec.id === id);
+    });
+
+    document.querySelectorAll(".nav-menu button").forEach(btn => {
+        const onclickAttr = btn.getAttribute("onclick") || "";
+        if (onclickAttr.includes(`'${id}'`)) {
+            btn.classList.add("active");
+        } else {
+            btn.classList.remove("active");
+        }
+    });
+}
+window.showSection = showSection;
+
+
+// ---------------- INIT APP ----------------
+function initApp() {
+    loadVolunteers();
+    renderHistory();
+    checkLoginSession();
+
+    const routeBtn = document.getElementById("find-route");
+    if (routeBtn) routeBtn.addEventListener("click", findSafeRoute);
+
+    if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                userLat = pos.coords.latitude;
+                userLon = pos.coords.longitude;
+
+                document.getElementById("user-location").textContent =
+                    `${userLat.toFixed(3)}, ${userLon.toFixed(3)}`;
+
+                initMap();
+                fetchWeather();
+                fetchShelters();
+                monitorBattery();
+            },
+            () => fallbackInit()
+        );
+    } else fallbackInit();
+
+    // Network awareness
+    window.addEventListener("offline", () => addHistory("system", "🌐 Offline mode activated"));
+    window.addEventListener("online", () => addHistory("system", "🌐 Online - live data restored"));
+}
+
+function fallbackInit() {
+    userLat = 20.5937;
+    userLon = 78.9629;
+    document.getElementById("user-location").textContent = "GPS blocked, using India default";
+    initMap();
+    fetchWeather();
+    fetchShelters();
+    monitorBattery();
+}
+
+
+// ---------------- MAP ----------------
+function initMap() {
+    const mapDiv = document.getElementById("map");
+    if (!mapDiv || typeof L === "undefined") return;
+
+    if (map) {
+        map.setView([userLat, userLon], 12);
+        return;
+    }
+
+    map = L.map("map").setView([userLat, userLon], 12);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+    L.marker([userLat, userLon]).addTo(map).bindPopup("📍 You are here").openPopup();
+}
+
+
+// ---------------- WEATHER ----------------
+async function fetchWeather() {
+    try {
+        const res = await fetch(`${BACKEND_URL}/api/weather?lat=${userLat}&lon=${userLon}`);
+        const data = await res.json();
+        latestWeather = data;
+
+        document.getElementById("temp").textContent = `${data.temperature ?? "--"}°C`;
+        document.getElementById("rain").textContent = `${data.rainfall ?? 0} mm`;
+        document.getElementById("humidity").textContent = `${data.humidity ?? "--"}%`;
+
+        updateRiskFromWeather(data);
+
+        addHistory("weather", `Weather updated: ${data.temperature}°C`);
+    } catch {
+        addHistory("weather", "⚠ Failed to update weather");
+    }
+}
+
+function updateRiskFromWeather(data) {
+    const rain = data.rainfall || 0;
+    const hum = data.humidity || 0;
+
+    let level = "Low", color = "green";
+    if (rain > 80 || hum > 90) { level = "High"; color = "red"; }
+    else if (rain > 40 || hum > 80) { level = "Moderate"; color = "orange"; }
+
+    document.getElementById("risk-text").textContent = level;
+    document.getElementById("risk-color").style.background = color;
+}
+
+
+// ---------------- BATTERY ----------------
+function monitorBattery() {
+    if (!navigator.getBattery) return;
+
+    navigator.getBattery().then((battery) => {
+        function update() {
+            const level = Math.round(battery.level * 100);
+            document.getElementById("battery-status").textContent = `${level}%`;
+
+            if (level <= 20) addHistory("system", "⚠ Battery low, enabling emergency power mode");
+        }
+
+        battery.addEventListener("levelchange", update);
+        update();
+    });
+}
+
+
+// ---------------- SHELTERS ----------------
+async function fetchShelters() {
+    const res = await fetch(`${BACKEND_URL}/api/shelters`);
+    const data = await res.json();
+
+    const list = document.getElementById("shelter-list");
+    list.innerHTML = "";
+
+    (data.shelters || []).forEach((s) => {
+        list.innerHTML += `<div class="contact-list"><strong>${s.name}</strong><br>${s.distance}</div>`;
+    });
+}
+
+
+// ---------------- AI PREDICTION ----------------
+async function runPrediction() {
+    document.getElementById("predicted-level").textContent = "Processing...";
+
+    const payload = {
+        rainfall_mm_24h: latestWeather?.rainfall || 0,
+        temperature_c: latestWeather?.temperature || 0,
+        humidity: latestWeather?.humidity || 0,
+    };
+
+    try {
+        const res = await fetch(`${BACKEND_URL}/api/predict-risk`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+
+        const data = await res.json();
+        const label = data.risk_label || "Unknown";
+
+        document.getElementById("predicted-level").textContent = `${label} (${data.confidence}%)`;
+        addHistory("ai", `AI predicted: ${label}`);
+    } catch {
+        document.getElementById("predicted-level").textContent = "Error";
+    }
+}
+window.runPrediction = runPrediction;
+
+
+// ---------------- ROUTE ----------------
+function findSafeRoute() {
+    const mapsUrl = `https://www.google.com/maps/search/high+ground+near+me/@${userLat},${userLon},14z`;
+    document.getElementById("route-result").innerHTML =
+        `Move to higher ground.<br><a style="color:#fff" href="${mapsUrl}" target="_blank">Open Map</a>`;
+
+    addHistory("route", "User requested safe route");
+}
+
+
+// ---------------- REPORT ----------------
+function submitReport() {
+    const text = document.getElementById("report-text").value.trim();
+    if (!text) return alert("Please enter a report.");
+
+    addHistory("report", `📝 ${text}`);
+    document.getElementById("report-text").value = "";
+    alert("Report saved.");
+}
+window.submitReport = submitReport;
+
+
+// ---------------- SOS ----------------
+function triggerSOS() {
+    const url = `https://www.google.com/maps?q=${userLat},${userLon}`;
+    const msg = `🚨 SOS FLOOD EMERGENCY 🚨\n📍 Location: ${url}\nPlease send help!`;
+
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+
+    new Audio("https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg").play().catch(()=>{});
+    addHistory("sos", "SOS triggered");
+}
+window.triggerSOS = triggerSOS;
+
+
+// ---------------- COMMUNITY ----------------
+function loadVolunteers() {
+    const list = document.getElementById("volunteer-list");
+    const data = JSON.parse(localStorage.getItem("volunteers") || "[]");
+
+    if (!data.length) return list.textContent = "No volunteers yet.";
+
+    list.innerHTML = data.map(v =>
+        `<div class='contact-list'><strong>${v.name}</strong> (${v.area})<br>📞 ${v.phone}</div>`
+    ).join("");
+}
+
+function addVolunteer() {
+    const name = prompt("Name:"), area = prompt("Area:"), phone = prompt("Phone:");
+    if (!name || !area || !phone) return;
+
+    const data = JSON.parse(localStorage.getItem("volunteers") || "[]");
+    data.push({ name, area, phone });
+    localStorage.setItem("volunteers", JSON.stringify(data));
+    loadVolunteers();
+    alert("Volunteer added ❤️");
+}
+window.addVolunteer = addVolunteer;
+
+
+// ---------------- HISTORY ----------------
+function addHistory(type, msg) {
+    const now = new Date().toLocaleString();
+    const entry = { time: now, type, message: msg };
+
+    const data = JSON.parse(localStorage.getItem("history") || "[]");
+    data.unshift(entry);
+    localStorage.setItem("history", JSON.stringify(data));
+
+    renderHistory();
+}
+
+function renderHistory() {
+    const box = document.getElementById("history-data");
+    const data = JSON.parse(localStorage.getItem("history") || "[]");
+
+    if (!data.length) return box.textContent = "No history yet.";
+
+    box.innerHTML = data.map(
+        e => `<div class='contact-list'><strong>[${e.type}] ${e.time}</strong><br>${e.message}</div>`
+    ).join("");
+}
+
+
+// ------------------------------------
+//  💙 ACCOUNT SYSTEM (Merged & Final)
+// ------------------------------------
+
+// Email login system (local mock)
+function emailLogin() {
+    const email = document.getElementById("email-input").value;
+    const pass = document.getElementById("email-pass").value;
+
+    if (!email || !pass) return alert("Enter Email & Password");
+
+    localStorage.setItem("floodguard_user", email);
+    updateLoginUI(email);
+}
+window.emailLogin = emailLogin;
+
+// OTP System (Mock mode)
+function sendOTP() {
+    let phone = document.getElementById("phone-input").value.trim();
+    if (!phone) return alert("Enter phone number");
+
+    alert("📩 OTP sent (Demo OTP: 1234)");
+
+    document.getElementById("otp-input").style.display="block";
+    document.getElementById("verify-otp-btn").style.display="block";
+
+    localStorage.setItem("pending_otp_number", phone);
+}
+window.sendOTP = sendOTP;
+
+function verifyOTP() {
+    const otp = document.getElementById("otp-input").value.trim();
+
+    if (otp === "1234") {
+        const phone = localStorage.getItem("pending_otp_number");
+        localStorage.setItem("floodguard_user", phone);
+        updateLoginUI(phone);
+        alert("✔ Login Successful");
+    } else {
+        alert("❌ Wrong OTP");
+    }
+}
+window.verifyOTP = verifyOTP;
+
+
+// Session Checker
+function checkLoginSession() {
+    const user = localStorage.getItem("floodguard_user");
+    if (user) updateLoginUI(user);
+}
+
+
+// Update UI
+function updateLoginUI(user) {
+    document.getElementById("login-section").style.display = "none";
+    document.getElementById("profile-section").style.display = "block";
+
+    document.getElementById("logged-user-contact").textContent = user;
+
+    let savedPic = localStorage.getItem("profilePic");
+    if (savedPic) document.getElementById("profile-img").src = savedPic;
+}
+
+
+// Logout
+function logout() {
+    localStorage.removeItem("floodguard_user");
+    location.reload();
+}
+window.logout = logout;
+
+
+// Upload Profile Image
+function changeProfile() {
+    const picker = document.createElement("input");
+    picker.type = "file";
+    picker.accept = "image/*";
+    
+    picker.onchange = (e) => {
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        reader.onload = () => {
+            localStorage.setItem("profilePic", reader.result);
+            document.getElementById("profile-img").src = reader.result;
+        };
+        reader.readAsDataURL(file);
+    };
+
+    picker.click();
+}
+window.changeProfile = changeProfile;
+
+
+// Feedback
+function submitFeedback() {
+    const text = document.getElementById("feedback-text").value.trim();
+    if (!text) return alert("Write feedback first");
+
+    addHistory("feedback", text);
+    alert("Thank you ❤️ Feedback saved.");
+}
+window.submitFeedback = submitFeedback;
+
+
+// SHARE APP
+function shareApp() {
+    const msg = "🌊 Flood Guard – Stay safe during floods.\n🚨 Emergency alerts, safe routes, shelters & more.\nDownload soon!";
+    
+    if (navigator.share) {
+        navigator.share({ text: msg });
+    } else {
+        window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+    }
+}
+window.shareApp = shareApp;
+
+
+// Theme toggle
+function toggleTheme() {
+    document.body.classList.toggle("dark-mode");
+}
+window.toggleTheme = toggleTheme;
+<!-- ACCOUNT -->
+<section id="account" class="section">
+    <h2>👤 Account & Settings</h2>
+
+    <!-- LOGIN AREA -->
+    <div id="login-section">
+        <h3>Login / Register</h3>
+
+        <!-- Email Login -->
+        <label>Email:</label>
+        <input type="email" id="email-input" placeholder="Enter Email">
+        <input type="password" id="email-pass" placeholder="Password">
+        <button onclick="emailLogin()">Login with Email</button>
+
+        <hr style="margin:14px 0;">
+
+        <!-- Phone Login -->
+        <label>Phone Number:</label>
+        <input type="tel" id="phone-input" placeholder="+91XXXXXXXXXX">
+
+        <button onclick="sendOTP()">Send OTP</button>
+
+        <input id="otp-input" type="number" placeholder="Enter OTP" style="display:none;">
+        <button id="verify-otp-btn" onclick="verifyOTP()" style="display:none;">Verify OTP</button>
+    </div>
+
+    <!-- PROFILE AREA -->
+    <div id="profile-section" style="display:none;">
+        <h3>Welcome User</h3>
+
+        <!-- Profile Image -->
+        <img id="profile-img" src="https://cdn-icons-png.flaticon.com/512/149/149071.png"
+            style="width:120px;height:120px;border-radius:50%;display:block;margin:auto;">
+        <button onclick="changeProfile()">Change Profile Picture</button>
+
+        <p><strong>Account:</strong> <span id="logged-user-contact"></span></p>
+
+        <button onclick="logout()" style="background:#900;">Logout</button>
+    </div>
+
+    <hr>
+
+    <!-- APP SETTINGS -->
+    <h3>⚙ App Settings</h3>
+    <button onclick="toggleTheme()">🌓 Toggle Dark Mode</button>
+    <button onclick="shareApp()">🔗 Share Application</button>
+
+    <button onclick="window.open('https://forms.gle/','_blank')">⭐ Rate Us</button>
+
+    <hr>
+
+    <!-- FEEDBACK -->
+    <h3>💬 Feedback</h3>
+    <textarea id="feedback-text" placeholder="Tell us what to improve..."></textarea>
+    <button onclick="submitFeedback()">Submit Feedback</button>
+
+    <hr>
+
+    <!-- ABOUT APP -->
+    <h3>ℹ About Flood Guard</h3>
+    <p>
+        Flood Guard is an AI-powered disaster alert system built for emergency safety.
+        It predicts risks, finds shelters, alerts users, supports SOS, and works offline.
+    </p>
+
+    <ul>
+        <li>✔ AI-based flood prediction</li>
+        <li>✔ Emergency rescue SOS</li>
+        <li>✔ Safe navigation & shelters</li>
+        <li>✔ Offline mode support</li>
+    </ul>
+
+    <hr>
+
+    <!-- FAQ -->
+    <h3>❓ Frequently Asked Questions</h3>
+
+    <details>
+        <summary> Does the app work without internet?</summary>
+        <p>Yes. Location, SOS and stored info continue to work offline.</p>
+    </details>
+
+    <details>
+        <summary> Is my data shared?</summary>
+        <p>No. All data stays on your device unless you share SOS messages.</p>
+    </details>
+
+    <details>
+        <summary> Can I use this anywhere in India?</summary>
+        <p>Yes, it is built on national-level open weather and GIS datasets.</p>
+    </details>
+
+    <hr>
+
+    <!-- TERMS -->
+    <h3>📜 Terms & Conditions</h3>
+    <p>
+        By using this app, you agree that Flood Guard provides early warning help but does not replace official disaster responses.
+        Location and emergency information is only used by you.
+    </p>
+</section>
+
+
+// ---------------- START APP ----------------
+window.addEventListener("DOMContentLoaded", initApp);
