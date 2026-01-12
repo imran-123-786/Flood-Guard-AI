@@ -524,10 +524,4 @@ window.toggleTheme = toggleTheme;
 
 // ---------------- START APP ----------------
 window.addEventListener("DOMContentLoaded", initApp);
-window.addEventListener("load", () => {
-    const video = document.getElementById("bg-video");
-    if (video) {
-        video.muted = true;
-        video.play().catch(() => {});
-    }
-});
+
