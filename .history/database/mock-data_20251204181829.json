@@ -1,8 +1,0 @@
-{
-  "users": [
-    { "email": "demo@example.com", "phone": "9876543210" }
-  ],
-  "shelters": [
-    { "name": "Govt School", "distance": "1.2 km" }
-  ]
-}
