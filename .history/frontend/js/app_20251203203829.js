@@ -2,7 +2,7 @@
 //  🔥 Flood Guard App.js
 // ----------------------------
 
-const BACKEND_URL = " https://flood-guard-ai.onrender.com";
+const BACKEND_URL = "http://localhost:5000";
 
 let userLat = null;
 let userLon = null;
