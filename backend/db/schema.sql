@@ -1,0 +1,47 @@
+CREATE TABLE IF NOT EXISTS users (
+  id VARCHAR(64) PRIMARY KEY,
+  name VARCHAR(120) NOT NULL,
+  email VARCHAR(190) NOT NULL UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
+  created_at DATETIME NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+  token VARCHAR(80) PRIMARY KEY,
+  user_id VARCHAR(64) NOT NULL,
+  email VARCHAR(190) NOT NULL,
+  name VARCHAR(120) NOT NULL,
+  created_at DATETIME NOT NULL,
+  INDEX idx_sessions_user_id (user_id)
+);
+
+CREATE TABLE IF NOT EXISTS community_volunteers (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(120) NOT NULL,
+  phone VARCHAR(32) NOT NULL,
+  area VARCHAR(200) NOT NULL,
+  skill VARCHAR(64) NOT NULL,
+  lat DOUBLE NULL,
+  lon DOUBLE NULL,
+  created_at DATETIME NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS community_help_requests (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  request_text TEXT NOT NULL,
+  priority VARCHAR(16) NOT NULL,
+  area VARCHAR(200) NOT NULL,
+  status VARCHAR(24) NOT NULL,
+  lat DOUBLE NULL,
+  lon DOUBLE NULL,
+  created_at DATETIME NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS history_events (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  event_type VARCHAR(64) NOT NULL,
+  message TEXT NOT NULL,
+  lat DOUBLE NULL,
+  lon DOUBLE NULL,
+  created_at DATETIME NOT NULL
+);

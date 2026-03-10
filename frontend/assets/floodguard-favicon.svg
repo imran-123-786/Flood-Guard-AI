@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Flood Guard">
+  <defs>
+    <linearGradient id="fg-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0A2A56"/>
+      <stop offset="100%" stop-color="#0D5FB8"/>
+    </linearGradient>
+    <linearGradient id="fg-wave" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#34D6FF"/>
+      <stop offset="100%" stop-color="#0BC2E8"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#fg-bg)"/>
+  <path d="M32 8c8 4 14 4 18 4v18c0 12-8 20-18 26-10-6-18-14-18-26V12c4 0 10 0 18-4z" fill="rgba(255,255,255,.16)" stroke="#BEEBFF" stroke-width="2"/>
+  <path d="M18 36c4-3 8-3 12 0s8 3 12 0 8-3 12 0v8H18z" fill="url(#fg-wave)"/>
+  <path d="M16 30c4-3 8-3 12 0s8 3 12 0 8-3 12 0" fill="none" stroke="#8FE8FF" stroke-width="2.3" stroke-linecap="round"/>
+  <circle cx="32" cy="24" r="3.8" fill="#D9F7FF"/>
+</svg>

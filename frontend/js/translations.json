@@ -1,0 +1,138 @@
+const translations = {
+
+    // =========================
+    // ENGLISH
+    // =========================
+    en: {
+
+        app_title: "Flood Guard AI",
+
+        dashboard: "Dashboard",
+        alerts: "Alerts",
+        prediction: "Prediction",
+        hotspots: "Hotspots",
+        readiness: "Readiness Score",
+        shelter: "Shelter",
+        route: "Safe Route",
+        radar: "Weather Radar",
+        report: "Report",
+        rescue: "Rescue",
+        news: "News",
+        history: "History",
+        community: "Community",
+        account: "Account",
+
+        live_dashboard: "Live Dashboard",
+        location: "Current Location",
+        flood_risk: "Flood Risk Level",
+        safety_info: "Safety Instructions",
+
+        ai_prediction: "AI Flood Prediction",
+        hotspot_analysis: "Flood Micro Hotspots",
+        readiness_score: "Pre-Monsoon Readiness Score",
+
+        shelters_near: "Nearby Safe Shelters",
+        safe_route: "Find Safe Route",
+        sos: "SOS Emergency",
+
+        volunteer_network: "Community Volunteers",
+        disaster_news: "Live Disaster News",
+
+        instruction1: "Avoid waterlogged roads and bridges.",
+        instruction2: "Keep emergency kit and documents ready.",
+        instruction3: "Follow official alerts and evacuation orders.",
+        instruction4: "Help elderly and children near you."
+
+    },
+
+
+    // =========================
+    // HINDI
+    // =========================
+    hi: {
+
+        app_title: "बाढ़ सुरक्षा एआई",
+
+        dashboard: "डैशबोर्ड",
+        alerts: "चेतावनी",
+        prediction: "एआई भविष्यवाणी",
+        hotspots: "हॉटस्पॉट",
+        readiness: "तैयारी स्कोर",
+        shelter: "शरण स्थल",
+        route: "सुरक्षित मार्ग",
+        radar: "मौसम रडार",
+        report: "रिपोर्ट",
+        rescue: "आपातकाल",
+        news: "समाचार",
+        history: "इतिहास",
+        community: "समुदाय",
+        account: "खाता",
+
+        live_dashboard: "लाइव डैशबोर्ड",
+        location: "वर्तमान स्थान",
+        flood_risk: "बाढ़ जोखिम स्तर",
+
+        ai_prediction: "एआई बाढ़ भविष्यवाणी",
+        hotspot_analysis: "बाढ़ हॉटस्पॉट",
+        readiness_score: "मानसून तैयारी स्कोर",
+
+        shelters_near: "पास के सुरक्षित शेल्टर",
+        safe_route: "सुरक्षित मार्ग खोजें",
+        sos: "एसओएस आपातकाल",
+
+        volunteer_network: "समुदाय स्वयंसेवक",
+        disaster_news: "लाइव आपदा समाचार",
+
+        instruction1: "पानी भरी सड़कों से बचें।",
+        instruction2: "जरूरी दस्तावेज़ और फोन चार्ज रखें।",
+        instruction3: "सरकारी चेतावनियों का पालन करें।",
+        instruction4: "बच्चों और बुजुर्गों की मदद करें।"
+
+    },
+
+
+    // =========================
+    // KANNADA
+    // =========================
+    kn: {
+
+        app_title: "ಪ್ರವಾಹ ರಕ್ಷಣೆ ಎಐ",
+
+        dashboard: "ಡ್ಯಾಶ್‌ಬೋರ್ಡ್",
+        alerts: "ಎಚ್ಚರಿಕೆ",
+        prediction: "ಎಐ ಮುನ್ಸೂಚನೆ",
+        hotspots: "ಹಾಟ್‌ಸ್ಪಾಟ್",
+        readiness: "ಸಿದ್ಧತೆ ಸ್ಕೋರ್",
+        shelter: "ಆಶ್ರಯ",
+        route: "ಸುರಕ್ಷಿತ ಮಾರ್ಗ",
+        radar: "ಹವಾಮಾನ ರಡಾರ್",
+        report: "ವರದಿ",
+        rescue: "ತುರ್ತು",
+        news: "ಸುದ್ದಿ",
+        history: "ಇತಿಹಾಸ",
+        community: "ಸಮುದಾಯ",
+        account: "ಖಾತೆ",
+
+        live_dashboard: "ಲೈವ್ ಡ್ಯಾಶ್‌ಬೋರ್ಡ್",
+        location: "ಪ್ರಸ್ತುತ ಸ್ಥಳ",
+        flood_risk: "ಪ್ರವಾಹ ಅಪಾಯ ಮಟ್ಟ",
+
+        ai_prediction: "ಎಐ ಪ್ರವಾಹ ಮುನ್ಸೂಚನೆ",
+        hotspot_analysis: "ಪ್ರವಾಹ ಹಾಟ್‌ಸ್ಪಾಟ್",
+        readiness_score: "ಮಳೆಗಾಲ ಸಿದ್ಧತೆ ಸ್ಕೋರ್",
+
+        shelters_near: "ಹತ್ತಿರದ ಆಶ್ರಯ ಕೇಂದ್ರಗಳು",
+        safe_route: "ಸುರಕ್ಷಿತ ಮಾರ್ಗ ಹುಡುಕಿ",
+        sos: "SOS ತುರ್ತು",
+
+        volunteer_network: "ಸಮುದಾಯ ಸ್ವಯಂಸೇವಕರು",
+        disaster_news: "ಲೈವ್ ವಿಪತ್ತು ಸುದ್ದಿ",
+
+        instruction1: "ನೀರಿನಿಂದ ತುಂಬಿದ ರಸ್ತೆಗಳಿಗೂ ಹೋಗಬೇಡಿ.",
+        instruction2: "ದಾಖಲೆಗಳು ಮತ್ತು ಚಾರ್ಜರ್ ಸಿದ್ಧವಾಗಿರಲಿ.",
+        instruction3: "ಸರ್ಕಾರದ ಎಚ್ಚರಿಕೆಗಳನ್ನು ಅನುಸರಿಸಿ.",
+        instruction4: "ಮಕ್ಕಳು ಮತ್ತು ಹಿರಿಯರಿಗೆ ಸಹಾಯ ಮಾಡಿ."
+
+    }
+
+};

@@ -1,0 +1,10 @@
+Flask==2.3.3
+Flask-CORS==4.0.0
+requests==2.31.0
+python-dotenv==1.0.0
+mysql-connector-python==9.0.0
+
+pandas==2.2.2
+numpy==1.26.4
+scikit-learn==1.4.2
+joblib==1.4.2

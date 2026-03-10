@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="application-name" content="Flood Guard AI">
+<meta name="theme-color" content="#0D5FB8">
+
+<title>Flood Guard – AI Flood Intelligence Platform</title>
+
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" type="image/svg+xml" href="assets/floodguard-favicon.svg">
+<link rel="shortcut icon" href="assets/floodguard-favicon.svg">
+<link rel="apple-touch-icon" href="assets/floodguard-favicon.svg">
+<link rel="manifest" href="assets/site.webmanifest">
+
+<!-- Leaflet CSS -->
+<link rel="stylesheet"
+href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"/>
+
+</head>
+
+
+<body>
+
+
+<!-- ================= BACKGROUND VIDEO ================= -->
+
+<video id="bg-video" autoplay muted loop playsinline preload="auto">
+<source src="./video/rain_background.mp4" type="video/mp4">
+</video>
+
+<div id="video-overlay"></div>
+
+
+
+<!-- ================= HEADER ================= -->
+
+<header>
+
+<div class="app-title">🌊 Flood Guard AI</div>
+
+<div class="top-nav">
+
+<div class="nav-menu">
+
+<button onclick="showSection('dashboard')" class="active">Dashboard</button>
+<button onclick="showSection('forecast')">Forecast</button>
+<button onclick="showSection('alerts')">Alerts</button>
+<button onclick="showSection('prediction')">Prediction</button>
+<button onclick="showSection('hotspots')">Hotspots</button>
+<button onclick="showSection('readiness')">Readiness</button>
+<button onclick="showSection('action')">Action Plan</button>
+<button onclick="showSection('shelter')">Shelters</button>
+<button onclick="showSection('route')">Route</button>
+<button onclick="showSection('radar')">Radar</button>
+<button onclick="showSection('report')">Report</button>
+<button onclick="showSection('rescue')">Rescue</button>
+<button onclick="showSection('news')">News</button>
+<button onclick="showSection('community')">Community</button>
+<button onclick="showSection('history')">History</button>
+<button onclick="showSection('account')">Account</button>
+
+</div>
+
+</div>
+
+</header>
+
+
+
+<main>
+
+<!-- ================= DASHBOARD ================= -->
+
+<section id="dashboard" class="section active">
+
+<h2>📍 Live Dashboard</h2>
+
+<p>
+<strong>Your Location:</strong>
+<span id="user-location">Detecting...</span>
+</p>
+
+<button onclick="requestLocation()" id="location-btn">
+📍 Enable Location
+</button>
+
+
+<div id="map-info" class="contact-list" style="display:none;margin-top:10px;">
+Click anywhere on the map to view location intelligence.
+</div>
+
+
+<div class="status-cards">
+
+<div class="card">
+<strong>Temperature</strong>
+<p id="temp">--°C</p>
+</div>
+
+<div class="card">
+<strong>Rainfall</strong>
+<p id="rain">-- mm</p>
+</div>
+
+<div class="card">
+<strong>Humidity</strong>
+<p id="humidity">--%</p>
+</div>
+
+<div class="card">
+<strong>Battery</strong>
+<p id="battery-status">--%</p>
+</div>
+
+<div class="card">
+<strong>Wind Speed</strong>
+<p id="wind">-- m/s</p>
+</div>
+
+</div>
+
+
+<div class="map-container">
+
+<h3>🗺 Flood Intelligence Map</h3>
+
+<div id="map" style="height:420px;"></div>
+<div id="hotspot-legend" style="margin-top:8px;font-size:13px;">
+<strong>Hotspot Legend:</strong>
+<span style="color:#d9534f;">● High</span>
+<span style="color:#f0ad4e;margin-left:8px;">● Moderate</span>
+<span style="color:#5cb85c;margin-left:8px;">● Low</span>
+</div>
+
+</div>
+
+
+<div class="risk-indicator">
+
+<h3>
+Flood Risk Level:
+<span id="risk-text">Loading...</span>
+</h3>
+
+<div id="risk-color"></div>
+
+</div>
+
+</section>
+
+
+
+<!-- ================= FORECAST ================= -->
+
+<section id="forecast" class="section">
+
+<h2>🌧️ 48-Hour Flood Forecast</h2>
+
+<p>AI predicts flood risk using rainfall forecast.</p>
+
+<button onclick="loadForecast()">Check Forecast</button>
+
+<div id="forecast-results" style="margin-top:15px;"></div>
+
+</section>
+
+
+
+<!-- ================= ALERTS ================= -->
+
+<section id="alerts" class="section">
+
+<h2>🚨 Live Flood Alerts</h2>
+
+<div id="alerts-container" class="contact-list">
+AI will generate alerts based on rainfall patterns.
+</div>
+
+</section>
+
+
+
+<!-- ================= AI PREDICTION ================= -->
+
+<section id="prediction" class="section">
+
+<h2>🤖 AI Flood Prediction</h2>
+
+<button onclick="runPrediction()">Run Prediction</button>
+
+<p>
+<strong>Prediction Result:</strong>
+<span id="predicted-level">--</span>
+</p>
+
+</section>
+
+
+
+<!-- ================= HOTSPOTS ================= -->
+
+<section id="hotspots" class="section">
+
+<h2>🔥 Flood Micro Hotspots</h2>
+
+<div id="hotspot-stats" class="contact-list">
+Hotspot analytics loading...
+</div>
+
+<div id="hotspot-satellite-gallery" class="contact-list" style="margin-top:12px;">
+Satellite snapshots loading...
+</div>
+
+</section>
+
+
+
+<!-- ================= READINESS ================= -->
+
+<section id="readiness" class="section">
+
+<h2>📊 Pre-Monsoon Readiness Score</h2>
+
+<div id="readiness-list" class="contact-list">
+Loading readiness score...
+</div>
+
+</section>
+
+
+
+<!-- ================= ACTION PLAN ================= -->
+
+<section id="action" class="section">
+
+<h2>✅ Decision Support Action Plan</h2>
+
+<p>Get area-specific actions for citizens and response teams.</p>
+
+<button onclick="loadActionPlan()">Generate Action Plan</button>
+
+<div id="action-plan" class="contact-list" style="margin-top:12px;">
+Action plan will appear here.
+</div>
+
+</section>
+
+
+<!-- ================= SHELTERS ================= -->
+
+<section id="shelter" class="section">
+
+<h2>🏚 Nearby Safe Shelters</h2>
+
+<div id="shelter-list">
+Loading shelters...
+</div>
+
+</section>
+
+
+
+<!-- ================= ROUTE ================= -->
+
+<section id="route" class="section">
+
+<h2>🚗 Safe Evacuation Route</h2>
+
+<button id="find-route">Find Safe Route</button>
+<button id="clear-route">Clear Route</button>
+
+<div class="map-container" style="margin-top:12px;">
+<h3>Route Map</h3>
+<div id="route-map" style="height:380px;"></div>
+</div>
+
+<div id="route-options" class="contact-list" style="margin-top:12px;">
+Loading nearby safe places...
+</div>
+
+<p id="route-result">Waiting...</p>
+
+</section>
+
+
+
+<!-- ================= RADAR ================= -->
+
+<section id="radar" class="section">
+
+<h2>🛰 Storm Intelligence Radar</h2>
+
+<select id="radar-source">
+<option value="windy-rain">Rain & Clouds</option>
+<option value="windy-thunder">Thunderstorms</option>
+<option value="windy-wind">Wind Speed</option>
+<option value="windy-temp">Temperature</option>
+</select>
+
+<button id="refresh-radar">Refresh Radar</button>
+<p id="radar-status">Radar ready.</p>
+
+<div id="radar-insights" class="contact-list">
+Loading nowcast insights...
+</div>
+
+<iframe
+id="radar-frame"
+src="https://embed.windy.com/embed2.html?lat=22.593&lon=78.962&zoom=5&level=surface&overlay=rain&menu=&message=&marker=&calendar=24&pressure=&type=map&location=coordinates&detail=&detailLat=22.593&detailLon=78.962&metricWind=default&metricTemp=default&radarRange=-1"
+style="width:100%; height:400px; border:none;">
+</iframe>
+
+</section>
+
+
+
+<!-- ================= REPORT ================= -->
+
+<section id="report" class="section">
+
+<h2>📍 Report Flood Situation</h2>
+
+<textarea id="report-text"
+placeholder="Describe flooding or damage"></textarea>
+
+<button onclick="submitReport()">Submit Report</button>
+
+</section>
+
+
+
+<!-- ================= RESCUE ================= -->
+
+<section id="rescue" class="section">
+
+<h2>🆘 Emergency Rescue</h2>
+
+<button onclick="triggerSOS()" class="sos-btn">
+🚨 SOS Emergency
+</button>
+
+<button onclick="copySOSMessage()">Copy SOS Message</button>
+<button onclick="shareSOSMessage()">Share SOS</button>
+<button onclick="openWhatsAppSOS()">Send via WhatsApp</button>
+
+<div id="sos-context" class="contact-list">
+Loading SOS context...
+</div>
+
+<textarea id="sos-message" readonly
+placeholder="SOS message will appear here"></textarea>
+
+<div id="sos-contacts" class="contact-list">
+Loading emergency contacts...
+</div>
+
+<div id="sos-nearby" class="contact-list">
+Loading nearby safe places...
+</div>
+
+</section>
+
+
+
+<!-- ================= NEWS ================= -->
+
+<section id="news" class="section">
+
+<h2>📰 Live Disaster News</h2>
+
+<select id="news-lang" onchange="loadNews()">
+
+<option value="en">English</option>
+<option value="hi">Hindi</option>
+<option value="ta">Tamil</option>
+<option value="kn">Kannada</option>
+<option value="te">Telugu</option>
+<option value="mr">Marathi</option>
+<option value="bn">Bengali</option>
+
+</select>
+
+<button onclick="loadNews()">Refresh News</button>
+
+<div id="news-list" style="margin-top:10px;">
+Loading news...
+</div>
+
+</section>
+
+
+
+<!-- ================= COMMUNITY ================= -->
+
+<section id="community" class="section">
+
+<h2>❤️ Volunteer Network</h2>
+
+<div class="contact-list">
+<h3>Register Volunteer</h3>
+<input id="vol-name" type="text" placeholder="Volunteer name">
+<input id="vol-phone" type="text" placeholder="Phone number">
+<input id="vol-area" type="text" placeholder="Area / City">
+<select id="vol-skill">
+<option value="rescue">Rescue</option>
+<option value="medical">Medical</option>
+<option value="logistics">Logistics</option>
+<option value="food">Food Support</option>
+</select>
+<button onclick="registerVolunteer()">Register Volunteer</button>
+</div>
+
+<div class="contact-list">
+<h3>Post Help Request</h3>
+<textarea id="help-text" placeholder="What help is needed?"></textarea>
+<select id="help-priority">
+<option value="high">High Priority</option>
+<option value="medium">Medium Priority</option>
+<option value="low">Low Priority</option>
+</select>
+<button onclick="submitHelpRequest()">Create Request</button>
+</div>
+
+<div id="community-status" class="contact-list">
+Community board ready.
+</div>
+
+<div id="volunteer-list"></div>
+<div id="request-list"></div>
+
+</section>
+
+
+
+<!-- ================= HISTORY ================= -->
+
+<section id="history" class="section">
+
+<h2>📄 Activity History</h2>
+
+<div class="history-toolbar">
+<select id="history-filter" onchange="renderHistory()">
+<option value="all">All Events</option>
+<option value="alert">Alerts</option>
+<option value="prediction">Prediction</option>
+<option value="route">Route</option>
+<option value="community">Community</option>
+<option value="sos">SOS</option>
+<option value="report">Report</option>
+</select>
+<button onclick="exportHistory()">Export</button>
+<button onclick="clearHistory()">Clear</button>
+</div>
+
+<div id="history-data">
+No activity yet.
+</div>
+
+</section>
+
+
+
+<!-- ================= ACCOUNT ================= -->
+
+<section id="account" class="section">
+
+<h2>👤 Account</h2>
+
+<div id="account-user" class="contact-list">Not logged in.</div>
+
+<input id="acc-name" type="text" placeholder="Full name (for registration)">
+<input id="acc-email" type="email" placeholder="Email">
+<input id="acc-password" type="password" placeholder="Password">
+
+<button onclick="registerAccount()">Create Account</button>
+<button onclick="loginAccount()">Login</button>
+<button onclick="logoutAccount()">Logout</button>
+
+<p id="account-status" style="margin-top:10px;">Status: Idle</p>
+
+</section>
+
+
+</main>
+
+
+
+<!-- ================= FOOTER ================= -->
+
+<footer>
+
+<p>© 2026 Flood Guard AI • Real-Time Urban Flood Monitoring & Decision Support Platform</p>
+
+</footer>
+
+
+
+<!-- ================= SCRIPTS ================= -->
+
+<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+
+<script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+
+<script src="js/app.js"></script>
+
+
+</body>
+</html>
