@@ -3,14 +3,17 @@ from flask_cors import CORS
 import json
 import math
 import os
+import hashlib
+import hmac
 from datetime import datetime
 from uuid import uuid4
+from threading import Lock
 
 import pandas as pd
 import requests
 from dotenv import load_dotenv
 from werkzeug.security import check_password_hash, generate_password_hash
-from db.mysql_client import init_schema, mysql_enabled
+from db.postgres_client import init_schema, postgres_enabled
 from db import repositories as db_repo
 
 
@@ -21,9 +24,9 @@ CORS(app)
 
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 NEWSDATA_API_KEY = os.getenv("NEWSDATA_API_KEY")
-DB_BOOTSTRAP = {"enabled": False, "schema_ready": False, "message": "MySQL not configured"}
+DB_BOOTSTRAP = {"enabled": False, "schema_ready": False, "message": "PostgreSQL not configured"}
 
-if mysql_enabled():
+if postgres_enabled():
     try:
         ok, msg = init_schema()
         DB_BOOTSTRAP = {"enabled": True, "schema_ready": bool(ok), "message": msg}
@@ -33,6 +36,13 @@ if mysql_enabled():
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_FOLDER = os.path.join(BASE_DIR, "data")
 USERS_FILE = os.path.join(DATA_FOLDER, "users.json")
+FEEDBACK_FILE = os.path.join(DATA_FOLDER, "feedback.jsonl")
+FEEDBACK_RESPONSE_FILE = os.path.join(DATA_FOLDER, "feedback_responses.jsonl")
+N8N_EVENTS_FILE = os.path.join(DATA_FOLDER, "n8n_events.jsonl")
+N8N_ALERTS_FILE = os.path.join(DATA_FOLDER, "n8n_alerts.jsonl")
+N8N_LOCK = Lock()
+FEEDBACK_LOCK = Lock()
+N8N_WEBHOOK_SECRET = os.getenv("N8N_WEBHOOK_SECRET", "").strip()
 
 INDIA_BOUNDS = {
     "lat_min": 6.0,
@@ -45,6 +55,121 @@ SESSIONS = {}
 ZONE_DF = None
 HOTSPOT_DF = None
 WARD_DF = None
+STATE_FALLBACK_COORDS = {
+    "andhra pradesh": (15.9129, 79.7400),
+    "arunachal pradesh": (28.2180, 94.7278),
+    "assam": (26.2006, 92.9376),
+    "bihar": (25.0961, 85.3131),
+    "chhattisgarh": (21.2787, 81.8661),
+    "goa": (15.2993, 74.1240),
+    "gujarat": (22.2587, 71.1924),
+    "haryana": (29.0588, 76.0856),
+    "himachal pradesh": (31.1048, 77.1734),
+    "jharkhand": (23.6102, 85.2799),
+    "karnataka": (15.3173, 75.7139),
+    "kerala": (10.8505, 76.2711),
+    "madhya pradesh": (22.9734, 78.6569),
+    "maharashtra": (19.7515, 75.7139),
+    "manipur": (24.6637, 93.9063),
+    "meghalaya": (25.4670, 91.3662),
+    "mizoram": (23.1645, 92.9376),
+    "nagaland": (26.1584, 94.5624),
+    "odisha": (20.9517, 85.0985),
+    "punjab": (31.1471, 75.3412),
+    "rajasthan": (27.0238, 74.2179),
+    "sikkim": (27.5330, 88.5122),
+    "tamil nadu": (11.1271, 78.6569),
+    "telangana": (18.1124, 79.0193),
+    "tripura": (23.9408, 91.9882),
+    "uttar pradesh": (26.8467, 80.9462),
+    "uttarakhand": (30.0668, 79.0193),
+    "west bengal": (22.9868, 87.8550),
+    "delhi": (28.7041, 77.1025),
+    "jammu and kashmir": (33.7782, 76.5762),
+    "ladakh": (34.1526, 77.5770),
+}
+RIVER_POINTS = [
+    {"id": "ganga_haridwar", "name": "Ganga", "lat": 29.9457, "lon": 78.1642, "state": "Uttarakhand", "city": "Haridwar", "basin": "Ganga", "length_km": 2525},
+    {"id": "ganga_varanasi", "name": "Ganga", "lat": 25.3176, "lon": 82.9739, "state": "Uttar Pradesh", "city": "Varanasi", "basin": "Ganga", "length_km": 2525},
+    {"id": "ganga_patna", "name": "Ganga", "lat": 25.5941, "lon": 85.1376, "state": "Bihar", "city": "Patna", "basin": "Ganga", "length_km": 2525},
+    {"id": "yamuna_delhi", "name": "Yamuna", "lat": 28.6139, "lon": 77.2090, "state": "Delhi", "city": "Delhi", "basin": "Ganga", "length_km": 1376},
+    {"id": "yamuna_mathura", "name": "Yamuna", "lat": 27.4924, "lon": 77.6737, "state": "Uttar Pradesh", "city": "Mathura", "basin": "Ganga", "length_km": 1376},
+    {"id": "brahmaputra_guwahati", "name": "Brahmaputra", "lat": 26.1445, "lon": 91.7362, "state": "Assam", "city": "Guwahati", "basin": "Brahmaputra", "length_km": 2900},
+    {"id": "brahmaputra_dibrugarh", "name": "Brahmaputra", "lat": 27.4728, "lon": 94.9120, "state": "Assam", "city": "Dibrugarh", "basin": "Brahmaputra", "length_km": 2900},
+    {"id": "godavari_nashik", "name": "Godavari", "lat": 19.9975, "lon": 73.7898, "state": "Maharashtra", "city": "Nashik", "basin": "Godavari", "length_km": 1465},
+    {"id": "godavari_rajahmundry", "name": "Godavari", "lat": 17.0005, "lon": 81.8040, "state": "Andhra Pradesh", "city": "Rajahmundry", "basin": "Godavari", "length_km": 1465},
+    {"id": "krishna_vijayawada", "name": "Krishna", "lat": 16.5062, "lon": 80.6480, "state": "Andhra Pradesh", "city": "Vijayawada", "basin": "Krishna", "length_km": 1400},
+    {"id": "krishna_sangli", "name": "Krishna", "lat": 16.8524, "lon": 74.5815, "state": "Maharashtra", "city": "Sangli", "basin": "Krishna", "length_km": 1400},
+    {"id": "narmada_jabalpur", "name": "Narmada", "lat": 23.1815, "lon": 79.9864, "state": "Madhya Pradesh", "city": "Jabalpur", "basin": "Narmada", "length_km": 1312},
+    {"id": "narmada_bharuch", "name": "Narmada", "lat": 21.7051, "lon": 72.9959, "state": "Gujarat", "city": "Bharuch", "basin": "Narmada", "length_km": 1312},
+    {"id": "tapti_burhanpur", "name": "Tapti", "lat": 21.3077, "lon": 76.2303, "state": "Madhya Pradesh", "city": "Burhanpur", "basin": "Tapti", "length_km": 724},
+    {"id": "tapti_surat", "name": "Tapti", "lat": 21.1702, "lon": 72.8311, "state": "Gujarat", "city": "Surat", "basin": "Tapti", "length_km": 724},
+    {"id": "mahanadi_cuttack", "name": "Mahanadi", "lat": 20.4625, "lon": 85.8828, "state": "Odisha", "city": "Cuttack", "basin": "Mahanadi", "length_km": 851},
+    {"id": "kaveri_tiruchirappalli", "name": "Kaveri", "lat": 10.7905, "lon": 78.7047, "state": "Tamil Nadu", "city": "Tiruchirappalli", "basin": "Kaveri", "length_km": 800},
+    {"id": "kaveri_mysuru", "name": "Kaveri", "lat": 12.2958, "lon": 76.6394, "state": "Karnataka", "city": "Mysuru", "basin": "Kaveri", "length_km": 800},
+    {"id": "sutlej_ludhiana", "name": "Sutlej", "lat": 30.9000, "lon": 75.8573, "state": "Punjab", "city": "Ludhiana", "basin": "Indus", "length_km": 1450},
+    {"id": "beas_amritsar", "name": "Beas", "lat": 31.6340, "lon": 74.8723, "state": "Punjab", "city": "Amritsar", "basin": "Indus", "length_km": 470},
+    {"id": "chenab_jammu", "name": "Chenab", "lat": 32.7266, "lon": 74.8570, "state": "Jammu and Kashmir", "city": "Jammu", "basin": "Indus", "length_km": 960},
+    {"id": "ravi_pathankot", "name": "Ravi", "lat": 32.2643, "lon": 75.6421, "state": "Punjab", "city": "Pathankot", "basin": "Indus", "length_km": 720},
+    {"id": "ghaghara_ayodhya", "name": "Ghaghara", "lat": 26.7990, "lon": 82.2040, "state": "Uttar Pradesh", "city": "Ayodhya", "basin": "Ganga", "length_km": 1080},
+    {"id": "gandak_purnia", "name": "Gandak", "lat": 25.7771, "lon": 87.4753, "state": "Bihar", "city": "Purnia", "basin": "Ganga", "length_km": 765},
+    {"id": "kosi_supaul", "name": "Kosi", "lat": 26.1260, "lon": 86.6050, "state": "Bihar", "city": "Supaul", "basin": "Ganga", "length_km": 729},
+    {"id": "sabarmati_ahmedabad", "name": "Sabarmati", "lat": 23.0225, "lon": 72.5714, "state": "Gujarat", "city": "Ahmedabad", "basin": "Sabarmati", "length_km": 371},
+    {"id": "periyar_kochi", "name": "Periyar", "lat": 9.9312, "lon": 76.2673, "state": "Kerala", "city": "Kochi", "basin": "Periyar", "length_km": 244},
+    {"id": "teesta_siliguri", "name": "Teesta", "lat": 26.7271, "lon": 88.3953, "state": "West Bengal", "city": "Siliguri", "basin": "Brahmaputra", "length_km": 414},
+    {"id": "subarnarekha_jamshedpur", "name": "Subarnarekha", "lat": 22.8046, "lon": 86.2029, "state": "Jharkhand", "city": "Jamshedpur", "basin": "Subarnarekha", "length_km": 474},
+    {"id": "penna_nellore", "name": "Penna", "lat": 14.4426, "lon": 79.9865, "state": "Andhra Pradesh", "city": "Nellore", "basin": "Penna", "length_km": 597},
+    {"id": "tungabhadra_hospet", "name": "Tungabhadra", "lat": 15.2695, "lon": 76.3871, "state": "Karnataka", "city": "Hospet", "basin": "Krishna", "length_km": 531},
+    {"id": "tungabhadra_kurnool", "name": "Tungabhadra", "lat": 15.8281, "lon": 78.0373, "state": "Andhra Pradesh", "city": "Kurnool", "basin": "Krishna", "length_km": 531},
+    {"id": "bhima_pune", "name": "Bhima", "lat": 18.5204, "lon": 73.8567, "state": "Maharashtra", "city": "Pune", "basin": "Krishna", "length_km": 861},
+    {"id": "bhima_solapur", "name": "Bhima", "lat": 17.6599, "lon": 75.9064, "state": "Maharashtra", "city": "Solapur", "basin": "Krishna", "length_km": 861},
+    {"id": "indravati_jagdalpur", "name": "Indravati", "lat": 19.0760, "lon": 82.0300, "state": "Chhattisgarh", "city": "Jagdalpur", "basin": "Godavari", "length_km": 535},
+    {"id": "wainganga_seoni", "name": "Wainganga", "lat": 22.0869, "lon": 79.5435, "state": "Madhya Pradesh", "city": "Seoni", "basin": "Godavari", "length_km": 579},
+    {"id": "chambal_kota", "name": "Chambal", "lat": 25.2138, "lon": 75.8648, "state": "Rajasthan", "city": "Kota", "basin": "Yamuna", "length_km": 965},
+    {"id": "son_dehri", "name": "Son", "lat": 24.9100, "lon": 84.1820, "state": "Bihar", "city": "Dehri", "basin": "Ganga", "length_km": 784},
+    {"id": "damodar_dhanbad", "name": "Damodar", "lat": 23.7957, "lon": 86.4304, "state": "Jharkhand", "city": "Dhanbad", "basin": "Damodar", "length_km": 592},
+    {"id": "brahmani_rourkela", "name": "Brahmani", "lat": 22.2604, "lon": 84.8536, "state": "Odisha", "city": "Rourkela", "basin": "Brahmani", "length_km": 799},
+    {"id": "baitarani_bhadrak", "name": "Baitarani", "lat": 21.0583, "lon": 86.4958, "state": "Odisha", "city": "Bhadrak", "basin": "Baitarani", "length_km": 365},
+    {"id": "palar_vellore", "name": "Palar", "lat": 12.9165, "lon": 79.1325, "state": "Tamil Nadu", "city": "Vellore", "basin": "Palar", "length_km": 348},
+    {"id": "ghataprabha_belagavi", "name": "Ghataprabha", "lat": 15.8497, "lon": 74.4977, "state": "Karnataka", "city": "Belagavi", "basin": "Krishna", "length_km": 283},
+    {"id": "sharavathi_honnavar", "name": "Sharavathi", "lat": 14.2780, "lon": 74.4519, "state": "Karnataka", "city": "Honnavar", "basin": "Arabian Sea", "length_km": 128},
+]
+
+RIVER_FLOW_DIRECTION = {
+    "Ganga": "West to East",
+    "Yamuna": "North-West to South-East",
+    "Brahmaputra": "East to West then South",
+    "Godavari": "West to East",
+    "Krishna": "West to East",
+    "Narmada": "East to West",
+    "Tapti": "East to West",
+    "Mahanadi": "West to East",
+    "Kaveri": "West to East",
+    "Sutlej": "East to West",
+    "Beas": "North-East to South-West",
+    "Chenab": "North to South-West",
+    "Ravi": "North-East to South-West",
+    "Ghaghara": "North-West to South-East",
+    "Gandak": "North to South-East",
+    "Kosi": "North to South-East",
+    "Sabarmati": "North to South",
+    "Periyar": "East to West",
+    "Teesta": "North to South",
+    "Subarnarekha": "West to East",
+    "Penna": "West to East",
+    "Tungabhadra": "West to East",
+    "Bhima": "North-West to South-East",
+    "Indravati": "West to East",
+    "Wainganga": "North to South",
+    "Chambal": "South to North-East",
+    "Son": "South-West to North-East",
+    "Damodar": "West to East",
+    "Brahmani": "North-West to South-East",
+    "Baitarani": "West to East",
+    "Palar": "West to East",
+    "Ghataprabha": "West to East",
+    "Sharavathi": "East to West",
+}
 
 
 def inside_india(lat, lon):
@@ -146,6 +271,38 @@ out body;
         return fallback
 
 
+def geocode_place_name(query):
+    q = (query or "").strip()
+    if not q:
+        return None
+
+    key = " ".join(q.lower().replace(",", " ").split())
+    if key in STATE_FALLBACK_COORDS:
+        lat, lon = STATE_FALLBACK_COORDS[key]
+        return {"name": q.title(), "lat": lat, "lon": lon}
+
+    try:
+        for candidate in [q, f"{q}, India"]:
+            r = requests.get(
+                "https://nominatim.openstreetmap.org/search",
+                params={"q": candidate, "format": "json", "limit": 1, "countrycodes": "in"},
+                headers={"User-Agent": "FloodGuard/1.0 (contact: floodguard@example.com)"},
+                timeout=14,
+            )
+            data = r.json()
+            if not data:
+                continue
+            item = data[0]
+            lat = float(item.get("lat"))
+            lon = float(item.get("lon"))
+            if not inside_india(lat, lon):
+                continue
+            return {"name": item.get("display_name", q), "lat": lat, "lon": lon}
+        return None
+    except Exception:
+        return None
+
+
 def load_users():
     if not os.path.exists(USERS_FILE):
         return []
@@ -157,6 +314,99 @@ def save_users(users):
     os.makedirs(DATA_FOLDER, exist_ok=True)
     with open(USERS_FILE, "w", encoding="utf-8") as f:
         json.dump(users, f, ensure_ascii=True, indent=2)
+
+
+def append_feedback(entry):
+    os.makedirs(DATA_FOLDER, exist_ok=True)
+    line = json.dumps(entry, ensure_ascii=False)
+    with FEEDBACK_LOCK:
+        with open(FEEDBACK_FILE, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+
+
+def read_feedback(limit=200):
+    if not os.path.exists(FEEDBACK_FILE):
+        return []
+    rows = []
+    with FEEDBACK_LOCK:
+        with open(FEEDBACK_FILE, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rows.append(json.loads(line))
+                except Exception:
+                    continue
+    rows.reverse()
+    return rows[: max(1, min(limit, 2000))]
+
+
+def append_feedback_response(entry):
+    os.makedirs(DATA_FOLDER, exist_ok=True)
+    line = json.dumps(entry, ensure_ascii=False)
+    with FEEDBACK_LOCK:
+        with open(FEEDBACK_RESPONSE_FILE, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+
+
+def read_feedback_responses():
+    if not os.path.exists(FEEDBACK_RESPONSE_FILE):
+        return {}
+    rows = {}
+    with FEEDBACK_LOCK:
+        with open(FEEDBACK_RESPONSE_FILE, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    item = json.loads(line)
+                    fid = item.get("feedback_id")
+                    if fid:
+                        rows[fid] = item
+                except Exception:
+                    continue
+    return rows
+
+
+def append_n8n_record(path, entry):
+    os.makedirs(DATA_FOLDER, exist_ok=True)
+    line = json.dumps(entry, ensure_ascii=False)
+    with N8N_LOCK:
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+
+
+def read_n8n_records(path, limit=200):
+    if not os.path.exists(path):
+        return []
+    rows = []
+    with N8N_LOCK:
+        with open(path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rows.append(json.loads(line))
+                except Exception:
+                    continue
+    rows.reverse()
+    return rows[: max(1, min(limit, 2000))]
+
+
+def verify_n8n_signature(raw_body, provided_signature):
+    if not N8N_WEBHOOK_SECRET:
+        return True
+    if not provided_signature:
+        return False
+    digest = hmac.new(
+        N8N_WEBHOOK_SECRET.encode("utf-8"),
+        raw_body,
+        hashlib.sha256,
+    ).hexdigest()
+    return hmac.compare_digest(digest, provided_signature.strip())
 
 
 def get_zone_df():
@@ -257,6 +507,41 @@ def get_hotspot_df():
 
         HOTSPOT_DF = pd.DataFrame.from_records(records)
     return HOTSPOT_DF
+
+
+def nearest_hotspot_risk(lat, lon):
+    df = get_hotspot_df()
+    if df is None or df.empty:
+        return 2.5, None
+
+    sample = df[["latitude", "longitude", "risk_score"]].copy()
+    sample["distance"] = ((sample["latitude"] - lat) ** 2 + (sample["longitude"] - lon) ** 2) ** 0.5
+    nearest = sample.nsmallest(6, "distance")
+    if nearest.empty:
+        return 2.5, None
+    return round(float(nearest["risk_score"].mean()), 2), round(float(nearest["distance"].min() * 111), 2)
+
+
+def risk_label_from_score(score):
+    if score is None:
+        return "unknown"
+    if score >= 4.75:
+        return "high"
+    if score >= 3.6:
+        return "moderate"
+    return "low"
+
+
+def river_weather_risk_score(weather):
+    rain = float(weather.get("rainfall", 0) or 0)
+    humidity = float(weather.get("humidity", 0) or 0)
+    wind = float(weather.get("wind_speed", 0) or 0)
+
+    rain_factor = min(rain / 30.0, 1.0)
+    humidity_factor = min(max((humidity - 60) / 40.0, 0), 1.0)
+    wind_factor = min(wind / 18.0, 1.0)
+    score = 1 + (0.6 * rain_factor + 0.3 * humidity_factor + 0.1 * wind_factor) * 5
+    return round(min(max(score, 1), 6), 2)
 
 
 def get_ward_df():
@@ -512,6 +797,12 @@ def get_weather_payload(lat, lon):
             "source": "simulated",
         }
 
+    def fnum(v, default=0.0):
+        try:
+            return float(v)
+        except Exception:
+            return float(default)
+
     url = "https://api.openweathermap.org/data/2.5/weather"
     r = requests.get(
         url,
@@ -519,14 +810,47 @@ def get_weather_payload(lat, lon):
         timeout=10,
     )
     data = r.json()
+
+    rain_1h = fnum((data.get("rain") or {}).get("1h"), 0)
+    rain_3h = fnum((data.get("rain") or {}).get("3h"), 0)
+    snow_1h = fnum((data.get("snow") or {}).get("1h"), 0)
+    wind_speed = fnum((data.get("wind") or {}).get("speed"), 0)
+    wind_gust = fnum((data.get("wind") or {}).get("gust"), 0)
+
+    rainfall = max(rain_1h, rain_3h / 3.0, snow_1h)
+    wind_out = max(wind_speed, wind_gust * 0.7)
+
+    # If current snapshot is too flat, use near-term forecast signal as live fallback.
+    if rainfall == 0 or wind_out == 0:
+        try:
+            fr = requests.get(
+                "https://api.openweathermap.org/data/2.5/forecast",
+                params={"lat": lat, "lon": lon, "appid": OPENWEATHER_API_KEY, "units": "metric"},
+                timeout=10,
+            ).json()
+            first = (fr.get("list") or [{}])[0]
+            f_rain = fnum(((first.get("rain") or {}).get("3h")), 0) / 3.0
+            f_wind = fnum((first.get("wind") or {}).get("speed"), 0)
+            if rainfall == 0:
+                rainfall = max(rainfall, f_rain)
+            if wind_out == 0:
+                wind_out = max(wind_out, f_wind)
+        except Exception:
+            pass
+
+    main = data.get("main", {}) if isinstance(data, dict) else {}
+    wind = data.get("wind", {}) if isinstance(data, dict) else {}
+    weather_rows = data.get("weather", []) if isinstance(data, dict) else []
+    desc = weather_rows[0].get("description", "Unknown") if weather_rows and isinstance(weather_rows[0], dict) else "Unknown"
+
     return {
-        "temperature": data["main"]["temp"],
-        "humidity": data["main"]["humidity"],
-        "pressure": data["main"]["pressure"],
-        "rainfall": data.get("rain", {}).get("1h", 0),
-        "wind_speed": data["wind"]["speed"],
-        "description": data["weather"][0]["description"],
-        "location": data.get("name", "Unknown"),
+        "temperature": fnum(main.get("temp"), 29.4),
+        "humidity": fnum(main.get("humidity"), 70),
+        "pressure": fnum(main.get("pressure"), 1009),
+        "rainfall": round(max(rainfall, 0), 2),
+        "wind_speed": round(max(wind_out, fnum(wind.get("speed"), 0)), 2),
+        "description": desc,
+        "location": data.get("name", "Unknown") if isinstance(data, dict) else "Unknown",
         "source": "openweather",
     }
 
@@ -626,6 +950,37 @@ def flood_hotspots():
 @app.route("/api/hotspots")
 def hotspots_alias():
     return flood_hotspots()
+
+
+@app.route("/api/rivers")
+def rivers():
+    try:
+        rows = []
+        for river in RIVER_POINTS:
+            score, nearest_km = nearest_hotspot_risk(river["lat"], river["lon"])
+            weather = {"rainfall": None, "humidity": None, "wind_speed": None, "source": "deferred"}
+            source = "hydrology-hotspot"
+            rows.append(
+                {
+                    **river,
+                    "risk_score": score,
+                    "risk_level": risk_label_from_score(score),
+                    "flow_direction": RIVER_FLOW_DIRECTION.get(river["name"], "Variable"),
+                    "nearest_flood_signal_km": nearest_km,
+                    "weather": {
+                        "rainfall": weather.get("rainfall"),
+                        "humidity": weather.get("humidity"),
+                        "wind_speed": weather.get("wind_speed"),
+                        "source": weather.get("source"),
+                    },
+                    "source": source,
+                }
+            )
+
+        rows = sorted(rows, key=lambda r: r["risk_score"], reverse=True)
+        return jsonify({"status": "success", "count": len(rows), "rivers": rows})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 @app.route("/api/readiness-score")
@@ -788,6 +1143,63 @@ def flood_forecast():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/prediction-trajectory")
+def prediction_trajectory():
+    lat = float(request.args.get("lat", 20.5937))
+    lon = float(request.args.get("lon", 78.9629))
+    slots = int(request.args.get("slots", 8))
+    slots = max(4, min(slots, 16))
+
+    if not inside_india(lat, lon):
+        lat, lon = 20.5937, 78.9629
+
+    try:
+        forecast_payload = flood_forecast().get_json()
+        forecast_rows = (forecast_payload or {}).get("forecast", [])[:slots]
+        if not forecast_rows:
+            return jsonify({"status": "error", "message": "No forecast rows available."}), 404
+
+        current_weather = get_weather_payload(lat, lon)
+        wind_now = float(current_weather.get("wind_speed", 0) or 0)
+
+        trajectory = []
+        for row in forecast_rows:
+            rain = float(row.get("rainfall_mm", 0) or 0)
+            humidity = float(row.get("humidity", current_weather.get("humidity", 70)) or 70)
+            temp = float(row.get("temp_c", current_weather.get("temperature", 27)) or 27)
+            pred = compute_prediction(rain, humidity, temp, lat, lon, wind_now)
+            trajectory.append(
+                {
+                    "timestamp": row.get("timestamp"),
+                    "rainfall_mm": rain,
+                    "humidity": humidity,
+                    "temp_c": temp,
+                    "risk_label": pred.get("risk_label"),
+                    "confidence": pred.get("confidence"),
+                    "score": pred.get("score"),
+                    "predicted_risk_level": pred.get("predicted_risk_level"),
+                }
+            )
+
+        max_score = max(float(x.get("score", 0) or 0) for x in trajectory)
+        first_high_idx = next((i for i, x in enumerate(trajectory) if int(x.get("predicted_risk_level", 0) or 0) >= 2), None)
+        runway_hours = slots * 3 if first_high_idx is None else first_high_idx * 3
+
+        return jsonify(
+            {
+                "status": "success",
+                "location": {"lat": lat, "lon": lon},
+                "max_score": round(max_score, 4),
+                "max_score_pct": round(max_score * 100, 2),
+                "runway_hours": int(runway_hours),
+                "trajectory": trajectory,
+                "source": "forecast+predict-risk",
+            }
+        )
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 @app.route("/api/alerts")
 def flood_alerts():
     lat = float(request.args.get("lat", 20.5937))
@@ -899,6 +1311,30 @@ def flood_alerts():
                     }
                 )
 
+        external_alerts = read_n8n_records(N8N_ALERTS_FILE, limit=40)
+        for ext in external_alerts:
+            lat_e = ext.get("lat")
+            lon_e = ext.get("lon")
+            radius_km = float(ext.get("radius_km", 220) or 220)
+            if lat_e is not None and lon_e is not None:
+                try:
+                    if haversine_km(lat, lon, float(lat_e), float(lon_e)) > radius_km:
+                        continue
+                except Exception:
+                    pass
+
+            alerts.append(
+                {
+                    "severity": str(ext.get("severity", "medium")).lower(),
+                    "title": ext.get("title", "External Flood Alert"),
+                    "message": ext.get("message", "n8n pipeline generated an alert event."),
+                    "time": ext.get("time", now),
+                    "source": ext.get("source", "n8n-pipeline"),
+                    "event_id": ext.get("event_id", ""),
+                    "confidence": ext.get("confidence"),
+                }
+            )
+
         if not alerts:
             alerts.append(
                 {
@@ -914,7 +1350,7 @@ def flood_alerts():
             {
                 "status": "success",
                 "location": {"lat": lat, "lon": lon, "district": zone["district"]},
-                "alerts": alerts[:8],
+                "alerts": alerts[:12],
             }
         )
     except Exception as e:
@@ -1078,6 +1514,97 @@ def safe_route():
         )
 
 
+@app.route("/api/interstate-safe-routes")
+def interstate_safe_routes():
+    origin = request.args.get("origin", "").strip()
+    destination = request.args.get("destination", "").strip()
+    origin_lat = request.args.get("origin_lat")
+    origin_lon = request.args.get("origin_lon")
+    dest_lat = request.args.get("dest_lat")
+    dest_lon = request.args.get("dest_lon")
+
+    start = None
+    end = None
+
+    if origin_lat is not None and origin_lon is not None:
+        s_lat, s_lon = float(origin_lat), float(origin_lon)
+        if inside_india(s_lat, s_lon):
+            start = {"name": origin or "Origin", "lat": s_lat, "lon": s_lon}
+    if dest_lat is not None and dest_lon is not None:
+        e_lat, e_lon = float(dest_lat), float(dest_lon)
+        if inside_india(e_lat, e_lon):
+            end = {"name": destination or "Destination", "lat": e_lat, "lon": e_lon}
+
+    if start is None:
+        start = geocode_place_name(origin)
+    if end is None:
+        end = geocode_place_name(destination)
+
+    if start is None or end is None:
+        return jsonify({"status": "error", "message": "Unable to locate origin/destination in India."}), 400
+
+    try:
+        osrm = requests.get(
+            "https://router.project-osrm.org/route/v1/driving/"
+            f"{start['lon']},{start['lat']};{end['lon']},{end['lat']}"
+            "?overview=full&geometries=geojson&alternatives=true&steps=false",
+            timeout=18,
+        ).json()
+        routes = osrm.get("routes", [])
+        if not routes:
+            raise ValueError("No OSRM routes")
+
+        hotspot_df = get_hotspot_df()[["latitude", "longitude", "risk_score"]].copy()
+        ranked = []
+
+        for idx, route in enumerate(routes[:3]):
+            coords = [[p[1], p[0]] for p in route["geometry"]["coordinates"]]
+            if len(coords) < 2:
+                continue
+
+            sample_step = max(1, len(coords) // 25)
+            sample_points = coords[::sample_step][:25]
+            point_scores = []
+            for lat, lon in sample_points:
+                sample = hotspot_df.copy()
+                sample["d"] = ((sample["latitude"] - lat) ** 2 + (sample["longitude"] - lon) ** 2) ** 0.5
+                near = sample.nsmallest(4, "d")
+                if not near.empty:
+                    point_scores.append(float(near["risk_score"].mean()))
+
+            avg_risk = round(sum(point_scores) / max(len(point_scores), 1), 2)
+            if avg_risk >= 4.7:
+                risk_level = "high"
+            elif avg_risk >= 3.7:
+                risk_level = "moderate"
+            else:
+                risk_level = "low"
+
+            ranked.append(
+                {
+                    "route_id": idx + 1,
+                    "distance_km": round(float(route["distance"]) / 1000, 2),
+                    "duration_min": round(float(route["duration"]) / 60),
+                    "flood_risk_score": avg_risk,
+                    "flood_risk_level": risk_level,
+                    "coordinates": coords,
+                }
+            )
+
+        ranked.sort(key=lambda r: (r["flood_risk_score"], r["duration_min"]))
+        return jsonify(
+            {
+                "status": "success",
+                "origin": start,
+                "destination": end,
+                "routes": ranked,
+                "recommended_route_id": ranked[0]["route_id"] if ranked else None,
+            }
+        )
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 def fallback_news_by_lang(lang):
     bank = {
         "en": [
@@ -1200,7 +1727,7 @@ def get_news():
 @app.route("/api/db/status")
 def db_status():
     status = dict(DB_BOOTSTRAP)
-    if mysql_enabled() and status.get("schema_ready"):
+    if postgres_enabled() and status.get("schema_ready"):
         try:
             status["connected"] = db_repo.ping()
         except Exception as e:
@@ -1221,7 +1748,7 @@ def register():
     if not name or not email or len(password) < 6:
         return jsonify({"error": "Name, email, and password(>=6 chars) are required."}), 400
 
-    if mysql_enabled() and DB_BOOTSTRAP.get("schema_ready"):
+    if postgres_enabled() and DB_BOOTSTRAP.get("schema_ready"):
         try:
             existing = db_repo.get_user_by_email(email)
             if existing:
@@ -1234,7 +1761,7 @@ def register():
                 datetime.now(),
             )
         except Exception as e:
-            return jsonify({"error": f"MySQL register failed: {e}"}), 500
+            return jsonify({"error": f"PostgreSQL register failed: {e}"}), 500
     else:
         users = load_users()
         if any(u["email"] == email for u in users):
@@ -1258,7 +1785,7 @@ def login():
     email = (data.get("email") or "").strip().lower()
     password = data.get("password") or ""
 
-    if mysql_enabled() and DB_BOOTSTRAP.get("schema_ready"):
+    if postgres_enabled() and DB_BOOTSTRAP.get("schema_ready"):
         try:
             user = db_repo.get_user_by_email(email)
             if not user or not check_password_hash(user["password_hash"], password):
@@ -1273,7 +1800,7 @@ def login():
                 }
             )
         except Exception as e:
-            return jsonify({"error": f"MySQL login failed: {e}"}), 500
+            return jsonify({"error": f"PostgreSQL login failed: {e}"}), 500
     else:
         users = load_users()
         user = next((u for u in users if u["email"] == email), None)
@@ -1293,11 +1820,11 @@ def login():
 @app.route("/api/account/profile")
 def profile():
     token = request.args.get("token", "")
-    if mysql_enabled() and DB_BOOTSTRAP.get("schema_ready"):
+    if postgres_enabled() and DB_BOOTSTRAP.get("schema_ready"):
         try:
             session = db_repo.get_session(token)
         except Exception as e:
-            return jsonify({"error": f"MySQL profile failed: {e}"}), 500
+            return jsonify({"error": f"PostgreSQL profile failed: {e}"}), 500
     else:
         session = SESSIONS.get(token)
     if not session:
@@ -1309,11 +1836,11 @@ def profile():
 def logout():
     data = request.get_json() or {}
     token = data.get("token", "")
-    if mysql_enabled() and DB_BOOTSTRAP.get("schema_ready"):
+    if postgres_enabled() and DB_BOOTSTRAP.get("schema_ready"):
         try:
             db_repo.delete_session(token)
         except Exception as e:
-            return jsonify({"error": f"MySQL logout failed: {e}"}), 500
+            return jsonify({"error": f"PostgreSQL logout failed: {e}"}), 500
     else:
         SESSIONS.pop(token, None)
     return jsonify({"message": "Logged out."})
@@ -1321,8 +1848,8 @@ def logout():
 
 @app.route("/api/community/volunteers", methods=["GET", "POST"])
 def community_volunteers():
-    if not (mysql_enabled() and DB_BOOTSTRAP.get("schema_ready")):
-        return jsonify({"error": "MySQL not configured"}), 503
+    if not (postgres_enabled() and DB_BOOTSTRAP.get("schema_ready")):
+        return jsonify({"error": "PostgreSQL not configured"}), 503
     if request.method == "GET":
         try:
             rows = db_repo.list_volunteers(limit=int(request.args.get("limit", 100)))
@@ -1348,8 +1875,8 @@ def community_volunteers():
 
 @app.route("/api/community/requests", methods=["GET", "POST"])
 def community_requests():
-    if not (mysql_enabled() and DB_BOOTSTRAP.get("schema_ready")):
-        return jsonify({"error": "MySQL not configured"}), 503
+    if not (postgres_enabled() and DB_BOOTSTRAP.get("schema_ready")):
+        return jsonify({"error": "PostgreSQL not configured"}), 503
     if request.method == "GET":
         try:
             rows = db_repo.list_help_requests(limit=int(request.args.get("limit", 100)))
@@ -1375,8 +1902,8 @@ def community_requests():
 
 @app.route("/api/community/requests/resolve", methods=["POST"])
 def community_resolve_request():
-    if not (mysql_enabled() and DB_BOOTSTRAP.get("schema_ready")):
-        return jsonify({"error": "MySQL not configured"}), 503
+    if not (postgres_enabled() and DB_BOOTSTRAP.get("schema_ready")):
+        return jsonify({"error": "PostgreSQL not configured"}), 503
     data = request.get_json() or {}
     req_id = data.get("id")
     if not req_id:
@@ -1390,8 +1917,8 @@ def community_resolve_request():
 
 @app.route("/api/history/events", methods=["GET", "POST"])
 def history_events():
-    if not (mysql_enabled() and DB_BOOTSTRAP.get("schema_ready")):
-        return jsonify({"error": "MySQL not configured"}), 503
+    if not (postgres_enabled() and DB_BOOTSTRAP.get("schema_ready")):
+        return jsonify({"error": "PostgreSQL not configured"}), 503
     if request.method == "GET":
         try:
             rows = db_repo.list_history_events(limit=int(request.args.get("limit", 200)))
@@ -1413,6 +1940,157 @@ def history_events():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/feedback", methods=["GET", "POST"])
+def feedback_api():
+    if request.method == "POST":
+        data = request.get_json() or {}
+        name = (data.get("name") or "").strip()
+        message = (data.get("message") or "").strip()
+        location = (data.get("location") or "").strip()
+
+        if not name:
+            return jsonify({"status": "error", "message": "Name is required."}), 400
+        if not message:
+            return jsonify({"status": "error", "message": "Feedback message is required."}), 400
+
+        entry = {
+            "id": str(uuid4()),
+            "name": name[:100],
+            "message": message[:5000],
+            "location": location[:180],
+            "created_at": datetime.now().isoformat(),
+        }
+        append_feedback(entry)
+        return jsonify({"status": "success", "feedback": entry})
+
+    try:
+        limit = int(request.args.get("limit", 50))
+    except Exception:
+        limit = 50
+    rows = read_feedback(limit=limit)
+    responses = read_feedback_responses()
+    for row in rows:
+        resp = responses.get(row.get("id"))
+        if resp:
+            row["management"] = {
+                "status": resp.get("status", "reviewed"),
+                "response": resp.get("response", ""),
+                "responder": resp.get("responder", "admin"),
+                "responded_at": resp.get("responded_at"),
+            }
+        else:
+            row["management"] = {"status": "open", "response": "", "responder": "", "responded_at": None}
+    return jsonify({"status": "success", "count": len(rows), "feedback": rows})
+
+
+@app.route("/api/feedback/respond", methods=["POST"])
+def feedback_respond():
+    data = request.get_json() or {}
+    feedback_id = (data.get("feedback_id") or "").strip()
+    response = (data.get("response") or "").strip()
+    responder = (data.get("responder") or "admin").strip()
+    status = (data.get("status") or "reviewed").strip().lower()
+    if not feedback_id:
+        return jsonify({"status": "error", "message": "feedback_id is required."}), 400
+    if not response:
+        return jsonify({"status": "error", "message": "response is required."}), 400
+    if status not in {"open", "reviewed", "resolved"}:
+        status = "reviewed"
+
+    entry = {
+        "id": str(uuid4()),
+        "feedback_id": feedback_id,
+        "response": response[:3000],
+        "responder": responder[:100],
+        "status": status,
+        "responded_at": datetime.now().isoformat(),
+    }
+    append_feedback_response(entry)
+    return jsonify({"status": "success", "response_entry": entry})
+
+
+@app.route("/api/n8n/ingest/event", methods=["POST"])
+def n8n_ingest_event():
+    raw = request.get_data() or b""
+    sig = request.headers.get("X-N8N-Signature", "")
+    if not verify_n8n_signature(raw, sig):
+        return jsonify({"status": "error", "message": "Invalid webhook signature"}), 401
+
+    data = request.get_json(silent=True) or {}
+    event_type = (data.get("event_type") or "generic").strip().lower()
+    location = data.get("location") or {}
+    payload = data.get("payload") if isinstance(data.get("payload"), dict) else {}
+
+    entry = {
+        "id": str(uuid4()),
+        "event_type": event_type,
+        "pipeline": data.get("pipeline", "n8n"),
+        "severity": str(data.get("severity", "medium")).lower(),
+        "title": data.get("title", f"N8N {event_type.title()} Event"),
+        "message": data.get("message", "n8n event received"),
+        "lat": location.get("lat"),
+        "lon": location.get("lon"),
+        "radius_km": data.get("radius_km", 220),
+        "confidence": data.get("confidence"),
+        "payload": payload,
+        "time": datetime.now().isoformat(),
+        "source": "n8n-pipeline",
+    }
+    append_n8n_record(N8N_EVENTS_FILE, entry)
+    return jsonify({"status": "success", "event": entry})
+
+
+@app.route("/api/n8n/ingest/alert", methods=["POST"])
+def n8n_ingest_alert():
+    raw = request.get_data() or b""
+    sig = request.headers.get("X-N8N-Signature", "")
+    if not verify_n8n_signature(raw, sig):
+        return jsonify({"status": "error", "message": "Invalid webhook signature"}), 401
+
+    data = request.get_json(silent=True) or {}
+    lat = data.get("lat")
+    lon = data.get("lon")
+    entry = {
+        "id": str(uuid4()),
+        "event_id": data.get("event_id", ""),
+        "title": data.get("title", "Automated Flood Alert"),
+        "message": data.get("message", "n8n generated flood alert"),
+        "severity": str(data.get("severity", "medium")).lower(),
+        "confidence": data.get("confidence"),
+        "lat": lat,
+        "lon": lon,
+        "radius_km": data.get("radius_km", 220),
+        "tags": data.get("tags", []),
+        "time": data.get("time") or datetime.now().isoformat(),
+        "source": data.get("source", "n8n-pipeline"),
+    }
+    append_n8n_record(N8N_ALERTS_FILE, entry)
+    return jsonify({"status": "success", "alert": entry})
+
+
+@app.route("/api/n8n/events")
+def n8n_events():
+    try:
+        limit = int(request.args.get("limit", 100))
+    except Exception:
+        limit = 100
+    rows = read_n8n_records(N8N_EVENTS_FILE, limit=limit)
+    return jsonify({"status": "success", "count": len(rows), "events": rows})
+
+
+@app.route("/api/n8n/alerts")
+def n8n_alerts():
+    try:
+        limit = int(request.args.get("limit", 100))
+    except Exception:
+        limit = 100
+    rows = read_n8n_records(N8N_ALERTS_FILE, limit=limit)
+    return jsonify({"status": "success", "count": len(rows), "alerts": rows})
+
+
 if __name__ == "__main__":
-    print("Backend running at http://127.0.0.1:5000")
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", "5000"))
+    debug = os.getenv("FLASK_DEBUG", "0") == "1"
+    print(f"Backend running at http://127.0.0.1:{port}")
+    app.run(debug=debug, host=host, port=port)

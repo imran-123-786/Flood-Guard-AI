@@ -2,8 +2,10 @@
   "name": "Flood Guard AI",
   "short_name": "Flood Guard",
   "description": "Real-Time Urban Flood Monitoring and Decision Support",
-  "start_url": "/",
+  "start_url": "../index.html",
+  "scope": "../",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#061326",
   "theme_color": "#0D5FB8",
   "icons": [

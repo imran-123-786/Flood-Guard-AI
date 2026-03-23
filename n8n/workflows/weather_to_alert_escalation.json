@@ -1,0 +1,70 @@
+{
+  "name": "Weather To Alert Escalation",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 10
+            }
+          ]
+        }
+      },
+      "id": "Cron_Weather",
+      "name": "Cron Weather",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 260]
+    },
+    {
+      "parameters": {
+        "url": "http://127.0.0.1:5000/api/flood-forecast?lat=12.9716&lon=77.5946",
+        "options": {}
+      },
+      "id": "Get_Forecast",
+      "name": "Get Forecast",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [470, 260]
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $json.forecast || [];\nlet peak = 0;\nfor (const r of rows) peak = Math.max(peak, Number(r.rainfall_mm || 0));\nconst severity = peak >= 25 ? 'high' : peak >= 10 ? 'medium' : 'low';\nreturn [{json:{\n  event_id: `wx_${Date.now()}`,\n  title: 'Forecast Rain Escalation',\n  message: `Peak 3h rainfall forecast: ${peak} mm near Bangalore`,\n  severity,\n  confidence: severity === 'high' ? 0.86 : severity === 'medium' ? 0.71 : 0.58,\n  lat: 12.9716,\n  lon: 77.5946,\n  radius_km: 180,\n  source: 'n8n-weather-escalation'\n}}];"
+      },
+      "id": "Build_Alert",
+      "name": "Build Alert Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 260]
+    },
+    {
+      "parameters": {
+        "url": "http://127.0.0.1:5000/api/n8n/ingest/alert",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{$json}}",
+        "options": {}
+      },
+      "id": "Push_Alert",
+      "name": "Push Alert To Backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 260]
+    }
+  ],
+  "connections": {
+    "Cron Weather": {
+      "main": [[{"node": "Get Forecast", "type": "main", "index": 0}]]
+    },
+    "Get Forecast": {
+      "main": [[{"node": "Build Alert Payload", "type": "main", "index": 0}]]
+    },
+    "Build Alert Payload": {
+      "main": [[{"node": "Push Alert To Backend", "type": "main", "index": 0}]]
+    }
+  },
+  "active": false,
+  "settings": {}
+}

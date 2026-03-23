@@ -1,4 +1,20 @@
-from db.mysql_client import get_connection
+from db.postgres_client import get_connection
+
+
+def _fetch_one_dict(cur):
+    row = cur.fetchone()
+    if not row:
+        return None
+    cols = [d[0] for d in cur.description]
+    return dict(zip(cols, row))
+
+
+def _fetch_all_dict(cur):
+    rows = cur.fetchall()
+    if not rows:
+        return []
+    cols = [d[0] for d in cur.description]
+    return [dict(zip(cols, row)) for row in rows]
 
 
 def ping():
@@ -15,13 +31,13 @@ def ping():
 
 def get_user_by_email(email):
     conn = get_connection()
-    cur = conn.cursor(dictionary=True)
+    cur = conn.cursor()
     try:
         cur.execute(
             "SELECT id, name, email, password_hash, created_at FROM users WHERE email=%s LIMIT 1",
             (email,),
         )
-        return cur.fetchone()
+        return _fetch_one_dict(cur)
     finally:
         cur.close()
         conn.close()
@@ -59,13 +75,13 @@ def create_session(token, user_id, email, name, created_at):
 
 def get_session(token):
     conn = get_connection()
-    cur = conn.cursor(dictionary=True)
+    cur = conn.cursor()
     try:
         cur.execute(
             "SELECT token, user_id, email, name, created_at FROM sessions WHERE token=%s LIMIT 1",
             (token,),
         )
-        return cur.fetchone()
+        return _fetch_one_dict(cur)
     finally:
         cur.close()
         conn.close()
@@ -91,11 +107,13 @@ def add_volunteer(name, phone, area, skill, lat, lon, created_at):
             """
             INSERT INTO community_volunteers (name, phone, area, skill, lat, lon, created_at)
             VALUES (%s,%s,%s,%s,%s,%s,%s)
+            RETURNING id
             """,
             (name, phone, area, skill, lat, lon, created_at),
         )
+        rid = cur.fetchone()[0]
         conn.commit()
-        return cur.lastrowid
+        return rid
     finally:
         cur.close()
         conn.close()
@@ -103,7 +121,7 @@ def add_volunteer(name, phone, area, skill, lat, lon, created_at):
 
 def list_volunteers(limit=100):
     conn = get_connection()
-    cur = conn.cursor(dictionary=True)
+    cur = conn.cursor()
     try:
         cur.execute(
             """
@@ -114,7 +132,7 @@ def list_volunteers(limit=100):
             """,
             (int(limit),),
         )
-        return cur.fetchall()
+        return _fetch_all_dict(cur)
     finally:
         cur.close()
         conn.close()
@@ -128,11 +146,13 @@ def add_help_request(text, priority, area, status, lat, lon, created_at):
             """
             INSERT INTO community_help_requests (request_text, priority, area, status, lat, lon, created_at)
             VALUES (%s,%s,%s,%s,%s,%s,%s)
+            RETURNING id
             """,
             (text, priority, area, status, lat, lon, created_at),
         )
+        rid = cur.fetchone()[0]
         conn.commit()
-        return cur.lastrowid
+        return rid
     finally:
         cur.close()
         conn.close()
@@ -140,7 +160,7 @@ def add_help_request(text, priority, area, status, lat, lon, created_at):
 
 def list_help_requests(limit=100):
     conn = get_connection()
-    cur = conn.cursor(dictionary=True)
+    cur = conn.cursor()
     try:
         cur.execute(
             """
@@ -151,7 +171,7 @@ def list_help_requests(limit=100):
             """,
             (int(limit),),
         )
-        return cur.fetchall()
+        return _fetch_all_dict(cur)
     finally:
         cur.close()
         conn.close()
@@ -180,11 +200,13 @@ def add_history_event(event_type, message, lat, lon, created_at):
             """
             INSERT INTO history_events (event_type, message, lat, lon, created_at)
             VALUES (%s,%s,%s,%s,%s)
+            RETURNING id
             """,
             (event_type, message, lat, lon, created_at),
         )
+        rid = cur.fetchone()[0]
         conn.commit()
-        return cur.lastrowid
+        return rid
     finally:
         cur.close()
         conn.close()
@@ -192,7 +214,7 @@ def add_history_event(event_type, message, lat, lon, created_at):
 
 def list_history_events(limit=200):
     conn = get_connection()
-    cur = conn.cursor(dictionary=True)
+    cur = conn.cursor()
     try:
         cur.execute(
             """
@@ -203,8 +225,7 @@ def list_history_events(limit=200):
             """,
             (int(limit),),
         )
-        return cur.fetchall()
+        return _fetch_all_dict(cur)
     finally:
         cur.close()
         conn.close()
-

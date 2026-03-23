@@ -1,0 +1,70 @@
+{
+  "name": "River Threshold Escalation",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "Cron_River",
+      "name": "Cron River",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [220, 240]
+    },
+    {
+      "parameters": {
+        "url": "http://127.0.0.1:5000/api/rivers",
+        "options": {}
+      },
+      "id": "Get_Rivers",
+      "name": "Get Rivers",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [430, 240]
+    },
+    {
+      "parameters": {
+        "jsCode": "const rivers = $json.rivers || [];\nconst high = rivers.filter(r => String(r.risk_level || '').toLowerCase() === 'high').slice(0,5);\nif (!high.length) {\n  return [{json:{\n    pipeline:'river-threshold',\n    event_type:'river_check',\n    severity:'low',\n    title:'River Threshold Stable',\n    message:'No high-risk river points in latest cycle.',\n    payload:{count_high:0}\n  }}];\n}\nreturn high.map(r => ({json:{\n  pipeline:'river-threshold',\n  event_type:'river_escalation',\n  severity:'high',\n  title:`River Escalation: ${r.name} (${r.city})`,\n  message:`${r.name} in ${r.city}, ${r.state} is in HIGH risk state.`,\n  location:{lat:r.lat, lon:r.lon},\n  radius_km: 160,\n  confidence: 0.82,\n  payload:r\n}}));"
+      },
+      "id": "Build_River_Events",
+      "name": "Build River Events",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 240]
+    },
+    {
+      "parameters": {
+        "url": "http://127.0.0.1:5000/api/n8n/ingest/event",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{$json}}",
+        "options": {}
+      },
+      "id": "Push_Event",
+      "name": "Push Event To Backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 240]
+    }
+  ],
+  "connections": {
+    "Cron River": {
+      "main": [[{"node": "Get Rivers", "type": "main", "index": 0}]]
+    },
+    "Get Rivers": {
+      "main": [[{"node": "Build River Events", "type": "main", "index": 0}]]
+    },
+    "Build River Events": {
+      "main": [[{"node": "Push Event To Backend", "type": "main", "index": 0}]]
+    }
+  },
+  "active": false,
+  "settings": {}
+}

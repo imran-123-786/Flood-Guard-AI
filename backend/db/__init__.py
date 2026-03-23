@@ -1,1 +1,1 @@
-# MySQL database package for Flood Guard backend.
+# PostgreSQL database package for Flood Guard backend.

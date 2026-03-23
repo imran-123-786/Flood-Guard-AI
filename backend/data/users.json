@@ -1,9 +1,0 @@
-[
-  {
-    "id": "fdf1e0a4-409f-47f1-b6e8-4325bc8b8ef8",
-    "name": "Test User",
-    "email": "test_user_fg@example.com",
-    "password_hash": "scrypt:32768:8:1$MYnmbIvZ20Nm8ptM$99d47bcdf7ae18d598147378a219ec3e48cc7c84afa9552fa282bf5a8e6bd8fed2bed1f6ac640d2d7d2848176e532782f6f2e6888cd0ce5a7a31ee9231a714b0",
-    "created_at": "2026-03-09T16:03:57.988384"
-  }
-]

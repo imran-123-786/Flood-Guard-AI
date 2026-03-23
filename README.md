@@ -1,52 +1,48 @@
 # Flood Guard AI
 
-Real-Time Urban Flood Monitoring and Decision Support Platform.
+**User-first flood intelligence platform for India**  
+Live weather, flood forecasting, river monitoring, safer travel routing, alerts, and automation in one product.
 
-Flood Guard AI is a GIS-integrated flood intelligence system built for urban flood preparedness and response.  
-It combines weather APIs, geospatial modeling, micro-hotspot generation, ward-level readiness scoring, and action planning into a single operational dashboard.
+![Platform](https://img.shields.io/badge/Platform-Web%20%2B%20Mobile%20PWA-0a66c2)
+![Backend](https://img.shields.io/badge/Backend-Flask-111827)
+![Frontend](https://img.shields.io/badge/Frontend-Vanilla%20JS-0ea5e9)
+![Database](https://img.shields.io/badge/Database-PostgreSQL-2563eb)
+![Automation](https://img.shields.io/badge/Automation-n8n-f97316)
 
----
+## Why Flood Guard AI
 
-## Problem Statement Alignment
-
-This project is designed to address:
-
-> "Develop a GIS-integrated predictive system to identify 2,500+ urban flood micro-hotspots using historical rainfall data, terrain elevation, and drainage capacity.  
-> Generate a ward-level Pre-Monsoon Readiness Score to enable proactive resource deployment before heavy rainfall events."
-
-### Current status
-
-- GIS-integrated map + area-aware analytics: `Implemented`
-- 2,500+ micro-hotspots: `Implemented` (current engine generates ~2504)
-- Hydrology factors used:
-  - historical rainfall
-  - terrain elevation
-  - drainage capacity
-- Ward-level readiness: `Implemented`
-- Proactive deployment recommendations: `Implemented`
-- Decision support workflow (citizen + authority actions): `Implemented`
-
----
+Flood Guard AI is built for daily users who need clear flood-risk awareness, not technical dashboards.  
+The platform focuses on fast decisions: where risk is, which river is rising, and which route is safer right now.
 
 ## Core Capabilities
 
-- Live weather intelligence (temperature, rainfall, humidity, wind)
-- Click-anywhere map intelligence (state/city/village/district + weather)
-- AI flood risk prediction with ward/district drivers
-- 48-hour flood forecast
-- Live flood alerts with severity
-- 2500+ micro-hotspot generation and map visualization
-- Ward-level pre-monsoon readiness and deployment plan
-- Safe route planning to nearest safe places
-- Radar tab (storm layers + nowcast insights)
-- Multilingual disaster news (`en`, `hi`, `ta`, `kn`, `te`, `mr`, `bn`)
-- Satellite hotspot snapshots
-- Community board (volunteers + help requests + matching)
-- History timeline (filter, export, clear)
-- Account register/login/logout (local file-backed)
-- Branded favicon + web app metadata
+- Live flood dashboard with location-aware intelligence
+- India river monitoring with risk markers and detail cards
+- Forecast + AI prediction with contextual risk summaries
+- Safer route planning between origin and destination
+- Radar tab with weather overlays and river movement support
+- Alerts center with escalation-ready messaging
+- Rescue and safety workflows
+- Account/session support
+- Multilingual UX (8+ language-ready architecture)
+- Real-time feedback collection and owner response flow
+- n8n webhook ingestion for advanced event pipelines
+- Offline-friendly PWA shell (service worker + manifest)
 
----
+## Product Architecture
+
+```text
+Frontend (HTML/CSS/JS + Leaflet + PWA)
+           |
+           v
+Backend API (Flask + ML/risk logic)
+           |
+           +--> PostgreSQL (users, feedback, app data)
+           |
+           +--> External APIs (weather/news/geocoding)
+           |
+           +--> n8n ingestion hooks (automation pipelines)
+```
 
 ## Tech Stack
 
@@ -54,81 +50,92 @@ This project is designed to address:
 - HTML5
 - CSS3
 - Vanilla JavaScript
-- Leaflet (map)
-- Leaflet Heat Layer
+- Leaflet map engine
+- Service Worker (`frontend/sw.js`)
 
 ### Backend
-- Python 3
-- Flask
-- Flask-CORS
-- Pandas
-- Requests
-- python-dotenv
+- Python 3.11+
+- Flask + Flask-CORS
+- Pandas + NumPy + scikit-learn
+- Requests + python-dotenv
 
-### External Services
-- OpenWeather (weather + forecast + reverse support)
-- Nominatim / maps.co reverse geocoding
-- Overpass (safe places / amenities)
-- OSRM (routing)
-- Windy embeds (radar layers)
-- ArcGIS World Imagery (satellite snapshots)
-- NewsData API (optional live news)
+### Database
+- PostgreSQL (primary)
+- File fallback only for selected local/dev flows
 
----
+### Automation
+- n8n workflows for weather, river, and geo-targeted alerts
 
-## Repository Structure
+## Repository Layout
 
 ```text
-flood-guard-app/
+flood-guard-AI/
   backend/
     app.py
+    wsgi.py
     requirements.txt
-    data/
-      flood_zone_summary.csv
-      india_flood_micro_hotspots.csv
-      ...
-    utils/
-      generate_hotspots.py
-      generate_micro_hotspots.py
-      generate_readiness_scores.py
+    .env.example
+    db/
+      postgres_client.py
+      repositories.py
+      schema_postgres.sql
+      README_postgresql_setup.md
+    tests/
   frontend/
     index.html
+    sw.js
     css/style.css
     js/app.js
-    js/translations.json
+    js/feedback.js
     assets/
-      floodguard-favicon.svg
-      site.webmanifest
-    video/
-      rain_background.mp4
-  README.md
+  n8n/
+    docker-compose.yml
+    workflows/
 ```
 
----
+## Quick Start
 
-## Setup and Run
-
-## 1) Clone
+### 1) Clone
 
 ```bash
-git clone https://github.com/imran-123-786/Flood-Guard-AI.git
-cd flood-guard-app
+git clone <your-repo-url>
+cd flood-guard-AI
 ```
 
-## 2) Backend Setup
+### 2) Backend
 
 ```bash
 cd backend
 python -m venv .venv
-.venv\Scripts\activate
+```
+
+PowerShell:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+Install dependencies:
+
+```bash
 pip install -r requirements.txt
 ```
 
-Create a `.env` file inside `backend/`:
+Create `backend/.env` from `.env.example` and set values:
 
 ```env
-OPENWEATHER_API_KEY=your_openweather_key
-NEWSDATA_API_KEY=your_newsdata_key
+OPENWEATHER_API_KEY=
+NEWSDATA_API_KEY=
+POSTGRES_HOST=127.0.0.1
+POSTGRES_PORT=5432
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=change_me
+POSTGRES_DB=flood_guard_ai
+POSTGRES_SSLMODE=prefer
+N8N_WEBHOOK_SECRET=
+FLASK_DEBUG=0
+HOST=0.0.0.0
+PORT=5000
 ```
 
 Run backend:
@@ -137,184 +144,92 @@ Run backend:
 python app.py
 ```
 
-Backend default URL:
+### 3) Frontend
 
-```text
-http://127.0.0.1:5000
+Open `frontend/index.html` with Live Server or static hosting.
+
+### 4) Optional n8n
+
+```bash
+cd n8n
+docker compose up -d
 ```
 
-## 3) Frontend Setup
+Import JSON workflows from `n8n/workflows/`.
 
-From project root, open:
+## Key API Areas
 
-```text
-frontend/index.html
+- Health: `GET /api/health`, `GET /api/db/status`
+- Live weather/intel: `GET /api/weather`, `GET /api/location-intel`
+- Forecast/prediction: `GET /api/flood-forecast`, `POST /api/predict-risk`
+- Rivers: `GET /api/rivers`
+- Routing: `GET /api/interstate-safe-routes`
+- Shelters/rescue: `GET /api/shelters`
+- Account: register/login/profile/logout endpoints
+- Feedback: submit/list/respond endpoints
+- n8n ingestion: event/alert endpoints
+
+## Production Deployment (Free/Low-Cost Friendly)
+
+1. PostgreSQL: Supabase or Neon
+2. Backend: Render / Railway / Fly.io
+3. Frontend: Vercel / Netlify / Cloudflare Pages
+4. n8n: self-host Docker VM (optional now)
+
+Deploy order:
+1. Create PostgreSQL and run schema
+2. Deploy backend with env vars
+3. Validate `/api/health` and `/api/db/status`
+4. Deploy frontend and point API base URL to backend
+5. Configure CORS for frontend domain
+6. Add n8n webhook secret and import workflows
+
+## What Not To Push
+
+- `.env` files
+- virtual environments (`.venv/`, `venv/`)
+- runtime user data logs/jsonl
+- n8n runtime state directory
+- cache/build artifacts
+
+## Security Baseline
+
+- Keep `FLASK_DEBUG=0` in production
+- Use strong DB password and webhook secret
+- Enforce HTTPS on frontend and backend
+- Restrict CORS to your real frontend domain
+- Add periodic DB backup
+
+## CI and Test
+
+- CI workflow: `.github/workflows/ci.yml`
+- Local smoke test:
+
+```bash
+cd backend
+pytest -q
 ```
 
-Recommended: use VS Code Live Server or any local static server.  
-Then hard refresh (`Ctrl+F5`) after updates.
+## Troubleshooting
+
+### PowerShell activation issue
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+### Missing `psycopg2`
+
+```bash
+pip install psycopg2-binary
+```
+
+### Slow pandas import / interrupted startup
+
+```bash
+pip install --force-reinstall numpy==1.26.4 pandas==2.2.2
+```
 
 ---
 
-## Backend API Reference
-
-### Health and Core
-- `GET /` - backend info
-- `GET /api/health` - health check
-
-### Location and Weather
-- `GET /api/weather?lat=&lon=`
-- `GET /api/location-intel?lat=&lon=`
-
-### Modeling and Risk
-- `POST /api/predict-risk`
-- `GET /api/flood-forecast?lat=&lon=`
-- `GET /api/alerts?lat=&lon=`
-- `GET /api/action-plan?lat=&lon=`
-
-### Hotspots and Readiness
-- `GET /api/flood-hotspots`
-- `GET /api/hotspots` (alias)
-- `GET /api/hotspot-analysis`
-- `GET /api/hydrology-engine-summary`
-- `GET /api/readiness-score`
-- `GET /api/hotspot-satellite?limit=`
-
-### Mobility and Safety
-- `GET /api/shelters?lat=&lon=&radius_km=`
-- `GET /api/safe-route?lat=&lon=&target_lat=&target_lon=&target_name=`
-
-### News and Account
-- `GET /api/news?lang=en|hi|ta|kn|te|mr|bn`
-- `POST /api/account/register`
-- `POST /api/account/login`
-- `GET /api/account/profile?token=...`
-- `POST /api/account/logout`
-
----
-
-## Hydrology Engine Method
-
-The current engine constructs ward-like micro-zones around district centroids and computes flood risk using:
-
-- historical rainfall signal
-- terrain/elevation vulnerability
-- derived drainage capacity
-- readiness weakness
-
-### Output artifacts
-
-- `risk_score` per micro-hotspot/ward
-- `drainage_capacity` per ward
-- `readiness_score` per ward
-- risk class distribution
-- deployment recommendations (pumps, boats, teams)
-
-### Typical risk bands
-
-- `High` (upper band, requires immediate prep)
-- `Moderate` (monitor and pre-position)
-- `Low` (routine monitoring)
-
----
-
-## Frontend User Flows
-
-### Dashboard
-- Shows selected-area weather and risk cards.
-- Click on map to set active area.
-- All tabs refresh to selected area context.
-
-### Action Plan
-- Generates actionable guidance for:
-  - citizens
-  - authorities
-- Includes nearest safe places and severity.
-
-### Route
-- Displays safe places list.
-- Allows user to choose destination and generate route.
-
-### Community
-- Register volunteers.
-- Create help requests.
-- Match volunteers to requests by area.
-
-### History
-- Unified event timeline.
-- Filter by event type.
-- Export JSON.
-- Clear history.
-
----
-
-## Hackathon Demo Script (Suggested)
-
-1. Open Dashboard and click a vulnerable location.
-2. Show map popup with local weather + admin details.
-3. Open Hotspots:
-   - total micro-hotspots
-   - high/moderate/low counts
-   - satellite snapshots
-4. Open Readiness:
-   - ward-level metrics
-   - deployment plan
-5. Open Action Plan:
-   - clear "what to do now" for citizens and authorities.
-6. Open Route:
-   - choose safe destination and generate route.
-7. Open Community + History:
-   - register volunteer, post request, show timeline logs.
-
----
-
-## Known Notes
-
-- News and some geospatial providers can rate-limit or fail; fallback responses are implemented.
-- Routing may use fallback path when external routing service is unavailable.
-- Search engine favicon visibility requires deployed public domain and indexing.
-
----
-
-## Security and Data
-
-- Account system currently stores users in local JSON (`backend/data/users.json`).
-- Session tokens are in-memory for current runtime.
-- For production, migrate to secure DB + JWT/redis/session store.
-
----
-
-## Future Enhancements
-
-- Real gauge/river-level ingestion
-- IoT drain/pump telemetry
-- Official alert integration (CAP)
-- Uncertainty bands for forecast
-- Damage and recovery tracking
-- GeoJSON/CSV export endpoints for authority integration
-
----
-
-## Contributing
-
-1. Fork repository
-2. Create feature branch
-3. Commit changes
-4. Open pull request
-
----
-
-## License
-
-See [`LICENSE`](LICENSE).
-
----
-
-## Acknowledgements
-
-- OpenStreetMap ecosystem (Nominatim, Overpass)
-- OpenWeather APIs
-- Windy embeds
-- ArcGIS World Imagery
-- NewsData API
-
+Built to become a practical, scalable, user-trusted flood intelligence startup.

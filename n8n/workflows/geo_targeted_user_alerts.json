@@ -1,0 +1,70 @@
+{
+  "name": "Geo Targeted User Alerts",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 10
+            }
+          ]
+        }
+      },
+      "id": "Cron_Geo",
+      "name": "Cron Geo",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 220]
+    },
+    {
+      "parameters": {
+        "url": "http://127.0.0.1:5000/api/n8n/alerts?limit=20",
+        "options": {}
+      },
+      "id": "Get_Alerts",
+      "name": "Get Pipeline Alerts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 220]
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $json.alerts || [];\nif (!rows.length) return [];\nconst top = rows.slice(0, 3).map(a => `${String(a.severity||'medium').toUpperCase()} - ${a.title}`).join(' | ');\nreturn [{json:{\n  pipeline:'geo-targeted-user-alerts',\n  event_type:'user_broadcast',\n  severity:'medium',\n  title:'Personalized Flood Alert Batch',\n  message:`Latest geo-targeted signals: ${top}`,\n  payload:{alerts: rows.slice(0, 3)}\n}}];"
+      },
+      "id": "Build_Broadcast",
+      "name": "Build Broadcast Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 220]
+    },
+    {
+      "parameters": {
+        "url": "http://127.0.0.1:5000/api/n8n/ingest/event",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{$json}}",
+        "options": {}
+      },
+      "id": "Push_Broadcast",
+      "name": "Push Broadcast Event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [930, 220]
+    }
+  ],
+  "connections": {
+    "Cron Geo": {
+      "main": [[{"node": "Get Pipeline Alerts", "type": "main", "index": 0}]]
+    },
+    "Get Pipeline Alerts": {
+      "main": [[{"node": "Build Broadcast Event", "type": "main", "index": 0}]]
+    },
+    "Build Broadcast Event": {
+      "main": [[{"node": "Push Broadcast Event", "type": "main", "index": 0}]]
+    }
+  },
+  "active": false,
+  "settings": {}
+}

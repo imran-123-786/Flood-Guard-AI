@@ -18,8 +18,19 @@ Scripts/
 backend/.env
 frontend/.env
 
+# Runtime/user-generated backend data (do not commit)
+backend/data/users.json
+backend/data/feedback.jsonl
+backend/data/feedback_responses.jsonl
+backend/data/n8n_events.jsonl
+backend/data/n8n_alerts.jsonl
+
+# n8n runtime state
+n8n/data/
+
 # Jupyter checkpoints
 .ipynb_checkpoints/
+.pytest_cache/
 
 # Large ML Models
 *.pkl

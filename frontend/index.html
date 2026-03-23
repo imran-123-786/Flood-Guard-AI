@@ -4,10 +4,14 @@
 <head>
 
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="application-name" content="Flood Guard AI">
 <meta name="theme-color" content="#0D5FB8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Flood Guard AI">
+<meta name="mobile-web-app-capable" content="yes">
 
 <title>Flood Guard – AI Flood Intelligence Platform</title>
 
@@ -27,13 +31,21 @@ href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"/>
 <body>
 
 
-<!-- ================= BACKGROUND VIDEO ================= -->
+<!-- ================= BACKGROUND RIVER THEME ================= -->
 
-<video id="bg-video" autoplay muted loop playsinline preload="auto">
-<source src="./video/rain_background.mp4" type="video/mp4">
-</video>
+<div id="river-bg"></div>
+<div id="river-overlay"></div>
+<div id="network-status" class="network-status" style="display:none;">Offline mode: showing latest saved data</div>
 
-<div id="video-overlay"></div>
+<div id="location-gate" class="location-gate">
+<div class="location-card">
+<h3>Use your device location</h3>
+<p>Flood Guard needs your location to show local river, alerts, and safest routes.</p>
+<button id="loc-allow-visit">Allow while visiting the site</button>
+<button id="loc-allow-once">Allow this time</button>
+<button id="loc-never">Never allow</button>
+</div>
+</div>
 
 
 
@@ -44,6 +56,16 @@ href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"/>
 <div class="app-title">🌊 Flood Guard AI</div>
 
 <div class="top-nav">
+<select id="app-lang" class="lang-switch">
+<option value="en">English</option>
+<option value="hi">Hindi</option>
+<option value="te">Telugu</option>
+<option value="ta">Tamil</option>
+<option value="kn">Kannada</option>
+<option value="mr">Marathi</option>
+<option value="bn">Bengali</option>
+<option value="gu">Gujarati</option>
+</select>
 
 <div class="nav-menu">
 
@@ -51,17 +73,11 @@ href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"/>
 <button onclick="showSection('forecast')">Forecast</button>
 <button onclick="showSection('alerts')">Alerts</button>
 <button onclick="showSection('prediction')">Prediction</button>
-<button onclick="showSection('hotspots')">Hotspots</button>
-<button onclick="showSection('readiness')">Readiness</button>
-<button onclick="showSection('action')">Action Plan</button>
-<button onclick="showSection('shelter')">Shelters</button>
-<button onclick="showSection('route')">Route</button>
+<button onclick="showSection('rivers')">Rivers</button>
+<button onclick="showSection('safety')">Safety Hub</button>
 <button onclick="showSection('radar')">Radar</button>
-<button onclick="showSection('report')">Report</button>
 <button onclick="showSection('rescue')">Rescue</button>
 <button onclick="showSection('news')">News</button>
-<button onclick="showSection('community')">Community</button>
-<button onclick="showSection('history')">History</button>
 <button onclick="showSection('account')">Account</button>
 
 </div>
@@ -76,22 +92,46 @@ href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"/>
 
 <!-- ================= DASHBOARD ================= -->
 
-<section id="dashboard" class="section active">
+<section id="dashboard" class="section active mobile-home">
 
 <h2>📍 Live Dashboard</h2>
+
+<div class="home-hero">
+<div>
+<p class="home-hello">Hello</p>
+<p class="home-user">Flood Guard User</p>
+<p id="dashboard-last-sync" class="sync-chip">Live sync pending</p>
+</div>
+<div class="hero-actions">
+<button class="profile-dot" onclick="openFeedbackModal()">Feedback</button>
+<button class="profile-dot" onclick="showSection('account')">👤</button>
+</div>
+</div>
+
+<div id="onboarding-card" class="onboarding-card" style="display:none;">
+<p><strong>Welcome to Flood Guard AI.</strong> Tap on map, save important places, and track safest routes in one tap.</p>
+<div class="onboarding-actions">
+<button onclick="dismissOnboarding()">Got it</button>
+</div>
+</div>
 
 <p>
 <strong>Your Location:</strong>
 <span id="user-location">Detecting...</span>
 </p>
-
-<button onclick="requestLocation()" id="location-btn">
-📍 Enable Location
-</button>
-
+<div id="user-location-details" class="contact-list" style="margin-top:8px;">
+Waiting for location details...
+</div>
 
 <div id="map-info" class="contact-list" style="display:none;margin-top:10px;">
 Click anywhere on the map to view location intelligence.
+</div>
+
+<div class="saved-actions">
+<button id="save-place-btn" onclick="saveCurrentPlace()">⭐ Save Selected Place</button>
+</div>
+<div id="saved-places" class="contact-list">
+No saved places yet.
 </div>
 
 
@@ -125,18 +165,51 @@ Click anywhere on the map to view location intelligence.
 </div>
 
 
+<div class="dashboard-map-layout">
 <div class="map-container">
 
 <h3>🗺 Flood Intelligence Map</h3>
+<div class="map-toolbar">
+<select id="map-style-select">
+<option value="street">Street</option>
+<option value="terrain">Terrain</option>
+<option value="satellite">Satellite View</option>
+</select>
+</div>
+
+<div class="water-banner">
+<div>
+<p class="water-title">WATER LEVEL near your area</p>
+<p class="water-sub">Live river and flood intelligence</p>
+</div>
+<button onclick="showSection('rivers')">Check Now</button>
+</div>
+
+<h3 style="margin-top:14px;">RELATED</h3>
+<div class="home-related">
+<button class="rel-card rel-weather" onclick="showSection('forecast')">Thunderstorm Weather</button>
+<button class="rel-card rel-time" id="live-time-card">--:--:-- Time</button>
+<button class="rel-card rel-stats" onclick="showSection('alerts')">Flood Statistics</button>
+</div>
 
 <div id="map" style="height:420px;"></div>
-<div id="hotspot-legend" style="margin-top:8px;font-size:13px;">
-<strong>Hotspot Legend:</strong>
+<div id="river-legend" class="river-legend">
+<strong>River Risk:</strong>
 <span style="color:#d9534f;">● High</span>
 <span style="color:#f0ad4e;margin-left:8px;">● Moderate</span>
 <span style="color:#5cb85c;margin-left:8px;">● Low</span>
 </div>
+</div>
 
+<aside class="trip-planner-panel">
+<h3>🧭 Safe Travel Planner</h3>
+<p>Plan safest route across cities/states with flood-risk scoring.</p>
+<input id="trip-origin" type="text" placeholder="Origin (e.g. Hyderabad, Telangana)">
+<input id="trip-destination" type="text" placeholder="Destination (e.g. Pune, Maharashtra)">
+<button id="plan-trip-btn">Find Safest Route</button>
+<div id="trip-status" class="contact-list">Enter origin and destination.</div>
+<div id="trip-routes" class="contact-list">No routes yet.</div>
+</aside>
 </div>
 
 
@@ -157,14 +230,18 @@ Flood Risk Level:
 
 <!-- ================= FORECAST ================= -->
 
-<section id="forecast" class="section">
+<section id="forecast" class="section app-card">
 
 <h2>🌧️ 48-Hour Flood Forecast</h2>
 
-<p>AI predicts flood risk using rainfall forecast.</p>
+<p>AI nowcast + impact intelligence (rain, humidity, risk windows, action timing).</p>
 
 <button onclick="loadForecast()">Check Forecast</button>
 
+<div id="forecast-headline" class="contact-list" style="margin-top:12px;">
+Forecast intelligence will appear here.
+</div>
+<canvas id="forecast-chart" height="170" style="margin-top:10px;"></canvas>
 <div id="forecast-results" style="margin-top:15px;"></div>
 
 </section>
@@ -173,9 +250,10 @@ Flood Risk Level:
 
 <!-- ================= ALERTS ================= -->
 
-<section id="alerts" class="section">
+<section id="alerts" class="section app-card">
 
 <h2>🚨 Live Flood Alerts</h2>
+<div id="alerts-intel" class="contact-list" style="margin-bottom:10px;">Risk intelligence loading...</div>
 
 <div id="alerts-container" class="contact-list">
 AI will generate alerts based on rainfall patterns.
@@ -187,7 +265,7 @@ AI will generate alerts based on rainfall patterns.
 
 <!-- ================= AI PREDICTION ================= -->
 
-<section id="prediction" class="section">
+<section id="prediction" class="section app-card">
 
 <h2>🤖 AI Flood Prediction</h2>
 
@@ -198,78 +276,86 @@ AI will generate alerts based on rainfall patterns.
 <span id="predicted-level">--</span>
 </p>
 
-</section>
+<div id="prediction-intel" class="contact-list">Prediction intelligence will appear here.</div>
+<canvas id="prediction-chart" height="170" style="margin-top:10px;"></canvas>
+<div id="prediction-trajectory" class="contact-list" style="margin-top:10px;">Trajectory pending.</div>
 
-
-
-<!-- ================= HOTSPOTS ================= -->
-
-<section id="hotspots" class="section">
-
-<h2>🔥 Flood Micro Hotspots</h2>
-
-<div id="hotspot-stats" class="contact-list">
-Hotspot analytics loading...
+<div class="contact-list" style="margin-top:10px;">
+<h3>What-If Simulator</h3>
+<label for="sim-rain">Rainfall (mm/24h)</label>
+<input id="sim-rain" type="range" min="0" max="220" step="1" value="30">
+<p id="sim-rain-val">30 mm</p>
+<label for="sim-humidity">Humidity (%)</label>
+<input id="sim-humidity" type="range" min="20" max="100" step="1" value="70">
+<p id="sim-humidity-val">70%</p>
+<button onclick="runWhatIfSimulation()">Run What-If</button>
+<div id="prediction-sim-result" style="margin-top:8px;">Simulation pending.</div>
 </div>
 
-<div id="hotspot-satellite-gallery" class="contact-list" style="margin-top:12px;">
-Satellite snapshots loading...
-</div>
-
-</section>
-
-
-
-<!-- ================= READINESS ================= -->
-
-<section id="readiness" class="section">
-
-<h2>📊 Pre-Monsoon Readiness Score</h2>
-
-<div id="readiness-list" class="contact-list">
-Loading readiness score...
-</div>
+<div id="prediction-actions" class="contact-list" style="margin-top:10px;">Adaptive action plan pending.</div>
 
 </section>
 
 
 
-<!-- ================= ACTION PLAN ================= -->
+<!-- ================= RIVERS ================= -->
 
-<section id="action" class="section">
+<section id="rivers" class="section app-card">
 
-<h2>✅ Decision Support Action Plan</h2>
+<h2>🏞 India River Monitor</h2>
 
-<p>Get area-specific actions for citizens and response teams.</p>
+<p>Major Indian rivers with flood risk index.</p>
 
-<button onclick="loadActionPlan()">Generate Action Plan</button>
+<div id="rivers-summary" class="contact-list">
+Loading rivers...
+</div>
 
-<div id="action-plan" class="contact-list" style="margin-top:12px;">
-Action plan will appear here.
+<div class="river-layout">
+<div id="rivers-list" class="contact-list river-list">
+Loading river points...
+</div>
+
+<div class="contact-list river-card">
+<div class="river-card-head">
+<h3 id="river-name">River forecast</h3>
+<span id="river-change-badge" class="river-badge">No change by tomorrow</span>
+</div>
+<p id="river-meta" class="river-meta">Select a river point to view details.</p>
+<canvas id="river-chart" height="180"></canvas>
+<div id="river-thresholds" class="river-thresholds"></div>
+</div>
+</div>
+
+<div id="river-detail" class="contact-list" style="margin-top:12px;">
+Click any river dot on the map or select from the list.
+</div>
+
+<h3 style="margin-top:14px;">FORUMS</h3>
+<div class="forum-card">
+<p><strong>Community Voice</strong></p>
+<p id="forum-post-text">“Early warning helped us prepare in time. Keep alerts active and share local river updates.”</p>
+<div class="forum-actions">
+<button onclick="forumReply()">Reply</button>
+<button onclick="forumShare()">Share</button>
+<button id="forum-save-btn" onclick="forumSave()">Save</button>
+</div>
+<div id="forum-replies" class="contact-list" style="margin-top:10px;">No replies yet.</div>
 </div>
 
 </section>
 
 
-<!-- ================= SHELTERS ================= -->
+<!-- ================= SAFETY HUB ================= -->
 
-<section id="shelter" class="section">
+<section id="safety" class="section app-card">
 
-<h2>🏚 Nearby Safe Shelters</h2>
+<h2>🛡 Safety Hub</h2>
+
+<p>Unified safe places + safest route planning.</p>
 
 <div id="shelter-list">
 Loading shelters...
 </div>
-
-</section>
-
-
-
-<!-- ================= ROUTE ================= -->
-
-<section id="route" class="section">
-
-<h2>🚗 Safe Evacuation Route</h2>
 
 <button id="find-route">Find Safe Route</button>
 <button id="clear-route">Clear Route</button>
@@ -291,7 +377,7 @@ Loading nearby safe places...
 
 <!-- ================= RADAR ================= -->
 
-<section id="radar" class="section">
+<section id="radar" class="section app-card">
 
 <h2>🛰 Storm Intelligence Radar</h2>
 
@@ -300,6 +386,7 @@ Loading nearby safe places...
 <option value="windy-thunder">Thunderstorms</option>
 <option value="windy-wind">Wind Speed</option>
 <option value="windy-temp">Temperature</option>
+<option value="river-flow">Rivers Movement</option>
 </select>
 
 <button id="refresh-radar">Refresh Radar</button>
@@ -315,28 +402,14 @@ src="https://embed.windy.com/embed2.html?lat=22.593&lon=78.962&zoom=5&level=surf
 style="width:100%; height:400px; border:none;">
 </iframe>
 
-</section>
-
-
-
-<!-- ================= REPORT ================= -->
-
-<section id="report" class="section">
-
-<h2>📍 Report Flood Situation</h2>
-
-<textarea id="report-text"
-placeholder="Describe flooding or damage"></textarea>
-
-<button onclick="submitReport()">Submit Report</button>
+<div id="radar-river-map" style="width:100%; height:400px; border:none; display:none; border-radius:10px;"></div>
 
 </section>
-
 
 
 <!-- ================= RESCUE ================= -->
 
-<section id="rescue" class="section">
+<section id="rescue" class="section app-card">
 
 <h2>🆘 Emergency Rescue</h2>
 
@@ -369,7 +442,7 @@ Loading nearby safe places...
 
 <!-- ================= NEWS ================= -->
 
-<section id="news" class="section">
+<section id="news" class="section app-card">
 
 <h2>📰 Live Disaster News</h2>
 
@@ -395,79 +468,9 @@ Loading news...
 
 
 
-<!-- ================= COMMUNITY ================= -->
-
-<section id="community" class="section">
-
-<h2>❤️ Volunteer Network</h2>
-
-<div class="contact-list">
-<h3>Register Volunteer</h3>
-<input id="vol-name" type="text" placeholder="Volunteer name">
-<input id="vol-phone" type="text" placeholder="Phone number">
-<input id="vol-area" type="text" placeholder="Area / City">
-<select id="vol-skill">
-<option value="rescue">Rescue</option>
-<option value="medical">Medical</option>
-<option value="logistics">Logistics</option>
-<option value="food">Food Support</option>
-</select>
-<button onclick="registerVolunteer()">Register Volunteer</button>
-</div>
-
-<div class="contact-list">
-<h3>Post Help Request</h3>
-<textarea id="help-text" placeholder="What help is needed?"></textarea>
-<select id="help-priority">
-<option value="high">High Priority</option>
-<option value="medium">Medium Priority</option>
-<option value="low">Low Priority</option>
-</select>
-<button onclick="submitHelpRequest()">Create Request</button>
-</div>
-
-<div id="community-status" class="contact-list">
-Community board ready.
-</div>
-
-<div id="volunteer-list"></div>
-<div id="request-list"></div>
-
-</section>
-
-
-
-<!-- ================= HISTORY ================= -->
-
-<section id="history" class="section">
-
-<h2>📄 Activity History</h2>
-
-<div class="history-toolbar">
-<select id="history-filter" onchange="renderHistory()">
-<option value="all">All Events</option>
-<option value="alert">Alerts</option>
-<option value="prediction">Prediction</option>
-<option value="route">Route</option>
-<option value="community">Community</option>
-<option value="sos">SOS</option>
-<option value="report">Report</option>
-</select>
-<button onclick="exportHistory()">Export</button>
-<button onclick="clearHistory()">Clear</button>
-</div>
-
-<div id="history-data">
-No activity yet.
-</div>
-
-</section>
-
-
-
 <!-- ================= ACCOUNT ================= -->
 
-<section id="account" class="section">
+<section id="account" class="section app-card">
 
 <h2>👤 Account</h2>
 
@@ -483,10 +486,36 @@ No activity yet.
 
 <p id="account-status" style="margin-top:10px;">Status: Idle</p>
 
+<div class="contact-list" style="margin-top:12px;">
+<h3>Feedback Manager</h3>
+<button onclick="loadFeedbackManager()">Refresh Feedback</button>
+<div id="feedback-admin" style="margin-top:10px;">No feedback loaded.</div>
+</div>
+
 </section>
 
 
 </main>
+
+<div id="feedback-modal" class="location-gate" style="display:none;">
+<div class="location-card" style="max-width:520px;">
+<h3>Share Feedback</h3>
+<p>Your feedback is stored in real time to improve Flood Guard AI.</p>
+<input id="fb-name" type="text" placeholder="Your name">
+<textarea id="fb-message" rows="4" placeholder="Write your feedback"></textarea>
+<button onclick="submitFeedback()">Submit Feedback</button>
+<button onclick="closeFeedbackModal()">Close</button>
+<div id="fb-status" class="contact-list" style="margin-top:10px;">Waiting...</div>
+</div>
+</div>
+
+<nav class="mobile-quick-nav">
+<button data-section="dashboard" onclick="showSection('dashboard')"><span>🏠</span><small>Home</small></button>
+<button data-section="alerts" onclick="showSection('alerts')"><span>🚨</span><small>Alerts</small></button>
+<button data-section="rivers" onclick="showSection('rivers')"><span>🌊</span><small>Rivers</small></button>
+<button data-section="safety" onclick="showSection('safety')"><span>🛡</span><small>Safety</small></button>
+<button data-section="account" onclick="showSection('account')"><span>👤</span><small>Account</small></button>
+</nav>
 
 
 
@@ -504,9 +533,8 @@ No activity yet.
 
 <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
 
-<script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
-
 <script src="js/app.js"></script>
+<script src="js/feedback.js"></script>
 
 
 </body>
